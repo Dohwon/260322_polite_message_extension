@@ -18,11 +18,13 @@ import {
   getTossOrdersByUser,
   getTossOrderByOrderId,
   getCurrentMonthlyUsage,
+  getUserByEmail,
   getUserByGoogleSub,
   getUserBySessionToken,
   linkGoogleAccount,
   listFeedback,
   markTossOrderPaid,
+  setFreeCredits,
   setUserSession,
   updatePlan
 } from "./db.js";
@@ -171,6 +173,11 @@ function cleanupOauthCache() {
   for (const [deviceId, row] of oauthDeviceResults.entries()) {
     if (row.expiresAtMs < now) oauthDeviceResults.delete(deviceId);
   }
+}
+
+function hasAdminAccess(req) {
+  const key = String(req.header("x-admin-key") || req.query.key || "").trim();
+  return Boolean(env.adminViewKey) && key === env.adminViewKey;
 }
 
 const rewriteLimiter = rateLimit({
@@ -414,8 +421,7 @@ app.post("/api/feedback", async (req, res) => {
 });
 
 app.get("/admin/feedback", (req, res) => {
-  const key = String(req.query.key || "").trim();
-  if (!env.adminViewKey || key !== env.adminViewKey) {
+  if (!hasAdminAccess(req)) {
     return res.status(401).send("Unauthorized");
   }
   const rows = listFeedback(500);
@@ -442,6 +448,48 @@ app.get("/admin/feedback", (req, res) => {
   <p>총 ${rows.length}건</p>
   <table><thead><tr><th>접수시각</th><th>이메일</th><th>주제</th><th>내용</th></tr></thead><tbody>${items}</tbody></table>
   </body></html>`);
+});
+
+app.post("/admin/test/bootstrap-user", (req, res) => {
+  if (!hasAdminAccess(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const planId = String(req.body?.planId || "free").trim();
+  const rememberMe = Boolean(req.body?.rememberMe ?? true);
+  if (!email || !email.includes("@")) {
+    return res.status(400).json({ error: "유효한 이메일이 필요합니다." });
+  }
+  if (!PLANS[planId]) {
+    return res.status(400).json({ error: "유효한 planId가 아닙니다." });
+  }
+
+  let user = createOrGetUser(email);
+  const current = getUserByEmail(email);
+  const nextPlan = PLANS[planId];
+  user = updatePlan({
+    userId: user.id,
+    planId,
+    stripeCustomerId: current?.stripe_customer_id || null,
+    stripeSubscriptionId: current?.stripe_subscription_id || null,
+    subscriptionStatus: planId === "free" ? null : "active"
+  });
+
+  if (planId === "free") {
+    user = setFreeCredits(user.id, nextPlan.maxMonthlyRequests);
+  }
+
+  const session = createSession(user.id, rememberMe);
+  user = setUserSession(user.id, session.token, session.expiresAt);
+  const monthly = ensureMonthlyUsage(user.id);
+
+  return res.json({
+    ok: true,
+    email: user.email,
+    sessionToken: session.token,
+    ...usageSummary(user, monthly)
+  });
 });
 
 app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {

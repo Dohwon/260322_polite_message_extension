@@ -1,32 +1,56 @@
-# Polite Message Rewriter
+# 260322-polite-message-extension
 
-거친 문장을 상황에 맞는 정중한 한국어 문장으로 다듬는 Chrome Extension + API 서비스입니다.
+감정적이거나 거친 문장을, 실제로 보내기 더 안전한 정중한 한국어 메시지로 바꿔 주는 Chrome Extension입니다.
 
-## 현재 제품 정책
-- 로그인/회원가입: `Google OAuth`만 지원
-- Free: 총 `3회` 체험, `1회 2,000자`
-- Pro Monthly: `4,900원/월`, 월 `50회`, `1회 4,000자`
-- Pro Annual: `39,000원/년`, 매달 `100회`, `1회 4,000자`
-- 결제: `TossPayments`
+## 무엇을 하나요
+- 원본 문장을 입력하면 더 공손하고 전달력 있는 문장으로 다듬어 줍니다.
+- 상사, 동료, 고객, 학부모 등 상대에 맞는 톤으로 조정할 수 있습니다.
+- 결과 문장은 바로 복사해서 메신저, 이메일, 문자에 붙여 넣을 수 있습니다.
 
-Google 로그인에 성공하면 백엔드 `users` 테이블에 회원 레코드가 생성되므로, 서버에서 해당 사용자가 회원인지, 어떤 플랜인지, 이번 달에 얼마나 썼는지 모두 식별할 수 있습니다.
+## 사용 대상
+- 회사에서 메시지 톤이 늘 고민되는 사람
+- 감정적으로 쓰고 나서 다시 고쳐 보내는 일이 잦은 사람
+- 업무/일상 커뮤니케이션을 조금 더 안전하게 관리하고 싶은 사람
 
-## 기술 스택
-- Extension: Vanilla JS, Chrome Storage API
-- Backend: Node.js + Express + SQLite
-- LLM: OpenAI `gpt-5-mini` / `gpt-5-nano`
-- Billing: TossPayments
+## 기본 사용 방법
+1. Chrome에서 확장 프로그램을 설치합니다.
+2. 확장 팝업을 엽니다.
+3. Google 계정으로 로그인합니다.
+4. 분위기, 받는 사람, 본인 역할을 선택합니다.
+5. 원본 문장을 입력합니다.
+6. `정중하게 다듬기` 버튼을 누릅니다.
+7. 결과를 복사해서 원하는 곳에 사용합니다.
 
-## 빠른 시작
+## 로그인 방식
+- 회원가입과 로그인은 Google 계정으로만 진행됩니다.
+- 별도의 아이디/비밀번호를 만들 필요가 없습니다.
+- 로그인 후 사용량과 현재 플랜 상태가 자동으로 연결됩니다.
 
-### 1) 백엔드 실행
+## 요금제 사용 흐름
+- 처음 로그인하면 무료 체험이 제공됩니다.
+- 무료 체험을 모두 사용한 뒤에는 Pro 플랜으로 업그레이드할 수 있습니다.
+- 결제는 플랜 페이지에서 진행됩니다.
+
+플랜 페이지:
+- 라이브: `https://polite-message-rewriter-production.up.railway.app/billing/plans`
+
+## 개발자 모드 테스트
+1. `chrome://extensions` 로 이동합니다.
+2. `개발자 모드`를 켭니다.
+3. `압축해제된 확장 프로그램을 로드`를 누릅니다.
+4. 이 프로젝트의 `extension` 폴더를 선택합니다.
+5. 로컬 백엔드를 먼저 실행한 뒤 팝업을 엽니다.
+
+개발자 모드에서는 확장 프로그램이 자동으로 `http://localhost:4310` 백엔드를 사용합니다.
+
+## 로컬 백엔드 실행
 ```bash
 cd backend
 npm install
 npm run dev
 ```
 
-필수 환경변수:
+## 필요한 환경변수
 - `OPENAI_API_KEY`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
@@ -34,40 +58,16 @@ npm run dev
 - `TOSS_CLIENT_KEY`
 - `TOSS_SECRET_KEY`
 
-권장 값:
-- `APP_BASE_URL=http://localhost:4310`
-- `ALLOWED_ORIGINS=*`
+## 주요 화면
+- Google 로그인
+- 톤/대상/역할 선택
+- 원본 문장 입력
+- 변환 결과 확인
+- 플랜 페이지 이동
 
-### 2) Chrome 개발자 모드 테스트
-1. `chrome://extensions` 이동
-2. `개발자 모드` 켜기
-3. `압축해제된 확장 프로그램을 로드` 클릭
-4. 이 프로젝트의 `extension` 폴더 선택
-5. 확장 팝업에서 `Google로 시작` 클릭
-6. 브라우저 탭에서 Google 로그인 완료
-7. 팝업으로 돌아와 문장 다듬기 테스트
+## 주의
+- 이 서비스는 문장을 더 정중하게 정리해 주지만, 사실관계까지 대신 판단하지는 않습니다.
+- 민감한 법률/계약/분쟁 문장은 직접 최종 확인이 필요합니다.
 
-개발자 모드에서는 `extension/popup.js`가 자동으로 `http://localhost:4310`을 사용합니다. 웹스토어 배포본에서는 `https://polite-message-rewriter-production.up.railway.app`를 사용합니다.
-
-### 3) 결제 테스트
-- 팝업에서 `Pro Monthly` 또는 `Pro Annual` 클릭
-- `https://polite-message-rewriter-production.up.railway.app/billing/plans` 또는 로컬 `/billing/plans` 페이지로 이동
-- 해당 페이지가 세션을 확인한 뒤 Toss 결제를 시작
-
-## 주요 API
-- `GET /api/auth/google/start?deviceId=...`
-- `GET /api/auth/google/callback`
-- `GET /api/auth/google/poll?deviceId=...`
-- `GET /api/auth/session`
-- `POST /api/rewrite`
-- `POST /api/billing/create-checkout`
-- `GET /billing/plans`
-- `GET /billing/toss/checkout`
-- `GET /billing/toss/success`
-
-## 참고 문서
-- [docs/pricing-policy.md](docs/pricing-policy.md)
-- [docs/cws-submission-checklist.md](docs/cws-submission-checklist.md)
-- [docs/cws-store-listing-ko.md](docs/cws-store-listing-ko.md)
-- [docs/reviewer-test-instructions.md](docs/reviewer-test-instructions.md)
-- [docs/privacy-policy-ko.md](docs/privacy-policy-ko.md)
+## Last Updated
+- 2026-03-23

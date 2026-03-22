@@ -82,7 +82,7 @@ function safeAddColumn(sql) {
 safeAddColumn(`ALTER TABLE users ADD COLUMN password_hash TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN session_token TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN session_expires_at TEXT`);
-safeAddColumn(`ALTER TABLE users ADD COLUMN free_credits_remaining INTEGER NOT NULL DEFAULT 5`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN free_credits_remaining INTEGER NOT NULL DEFAULT 3`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN auth_provider TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN google_sub TEXT`);
@@ -216,6 +216,12 @@ const clearSessionStmt = db.prepare(`
   UPDATE users
   SET session_token = NULL,
       session_expires_at = NULL,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ?
+`);
+const setFreeCreditsStmt = db.prepare(`
+  UPDATE users
+  SET free_credits_remaining = ?,
       updated_at = CURRENT_TIMESTAMP
   WHERE id = ?
 `);
@@ -385,6 +391,11 @@ export function clearUserSession(userId) {
 export function consumeFreeCredit(userId) {
   const info = consumeFreeCreditStmt.run(userId);
   return info.changes > 0;
+}
+
+export function setFreeCredits(userId, count) {
+  setFreeCreditsStmt.run(Number(count) || 0, userId);
+  return getUserByIdStmt.get(userId);
 }
 
 export function linkGoogleAccount(userId, { googleSub, googleName, googlePicture }) {
