@@ -71,6 +71,28 @@ label {
   font-weight: 600;
 }
 
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.label-row label {
+  margin: 0 0 4px;
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 800;
+  background: #e7edfc;
+  color: #1f3f89;
+  border: 1px solid #d0daf4;
+}
+
 label.inline {
   display: flex;
   align-items: center;
@@ -198,4 +220,8 @@ button.ghost:hover {
 
 #logoutWrap {
   display: none;
+}
+
+.hidden {
+  display: none !important;
 }

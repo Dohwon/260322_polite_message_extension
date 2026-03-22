@@ -1,13 +1,12 @@
 const LIVE_API_BASE_URL = "https://polite-message-rewriter-production.up.railway.app";
-const LOCAL_API_BASE_URL = "http://localhost:4310";
-const manifest = chrome.runtime.getManifest();
-const DEFAULT_API_BASE_URL = manifest.update_url ? LIVE_API_BASE_URL : LOCAL_API_BASE_URL;
+const DEFAULT_API_BASE_URL = LIVE_API_BASE_URL;
 
 const els = {
   accountSummary: document.getElementById("accountSummary"),
   authStatus: document.getElementById("authStatus"),
   googleLoginBtn: document.getElementById("googleLoginBtn"),
   logoutBtn: document.getElementById("logoutBtn"),
+  plansInfoBtn: document.getElementById("plansInfoBtn"),
   planSummary: document.getElementById("planSummary"),
   tone: document.getElementById("tone"),
   recipient: document.getElementById("recipient"),
@@ -106,7 +105,7 @@ function usageText(user) {
   const used = Number(user.usage.requestCount || 0);
   const limit = Number(user.limits.maxMonthlyRequests || 0);
   if (user.planId === "free") {
-    return `무료 ${user.usage.freeCreditsRemaining}/${user.usage.freeCreditsTotal}회 남음 · 1회 ${user.limits.maxCharsPerRequest}자`;
+    return `무료 ${user.usage.freeCreditsRemaining}/${user.usage.freeCreditsTotal}회 남음 · 월 토큰 ${user.limits.maxMonthlyInputTokens} 제한`;
   }
   return `${user.planName} · 이번 달 ${used}/${limit}회 사용 · 1회 ${user.limits.maxCharsPerRequest}자`;
 }
@@ -115,13 +114,14 @@ function updateAuthUI() {
   const isLoggedIn = Boolean(state.user);
   els.googleLoginBtn.disabled = isLoggedIn;
   els.logoutBtn.disabled = !isLoggedIn;
+  els.logoutBtn.classList.toggle("hidden", !isLoggedIn);
   els.rewriteBtn.disabled = !isLoggedIn;
   els.monthlyBtn.disabled = !isLoggedIn;
   els.annualBtn.disabled = !isLoggedIn;
 
   if (!isLoggedIn) {
-    els.accountSummary.textContent = "Google 계정으로 로그인하면 백엔드에 회원으로 등록되고 Free 3회가 자동 지급됩니다.";
-    els.planSummary.textContent = "Free: 총 3회 / Pro Monthly: 월 50회 / Pro Annual: 월 100회";
+    els.accountSummary.textContent = "Google 계정으로 로그인하면 백엔드에 회원으로 등록되고 Free 5회가 자동 지급됩니다.";
+    els.planSummary.textContent = "Free: 총 5회 + 월 100토큰 / Pro Monthly: 월 50회 / Pro Annual: 월 100회";
     return;
   }
 
@@ -133,7 +133,7 @@ async function refreshSession() {
   if (!state.sessionToken) {
     state.user = null;
     updateAuthUI();
-    setStatus("Google 로그인 후 사용할 수 있습니다. Free 3회 체험이 먼저 제공됩니다.");
+    setStatus("Google 로그인 후 사용할 수 있습니다. Free 5회 체험이 먼저 제공됩니다.");
     return;
   }
 
@@ -273,11 +273,11 @@ async function copyResult() {
 }
 
 async function goPlans(target) {
-  if (!state.sessionToken) {
-    setStatus("먼저 Google 로그인해 주세요.", "error");
-    return;
-  }
-  const url = `${state.apiBaseUrl}/billing/plans?target=${encodeURIComponent(target)}&sessionToken=${encodeURIComponent(state.sessionToken)}`;
+  const params = new URLSearchParams();
+  if (target) params.set("target", target);
+  if (state.sessionToken) params.set("sessionToken", state.sessionToken);
+  const qs = params.toString();
+  const url = `${state.apiBaseUrl}/billing/plans${qs ? `?${qs}` : ""}`;
   await chrome.tabs.create({ url });
 }
 
@@ -286,6 +286,7 @@ els.googleLoginBtn.addEventListener("click", loginWithGoogle);
 els.logoutBtn.addEventListener("click", logout);
 els.rewriteBtn.addEventListener("click", rewrite);
 els.copyBtn.addEventListener("click", copyResult);
+els.plansInfoBtn.addEventListener("click", () => goPlans(""));
 els.monthlyBtn.addEventListener("click", () => goPlans("pro_monthly"));
 els.annualBtn.addEventListener("click", () => goPlans("pro_annual"));
 

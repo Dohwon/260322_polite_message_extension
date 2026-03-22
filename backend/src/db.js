@@ -59,6 +59,14 @@ CREATE TABLE IF NOT EXISTS toss_orders (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS feedback_posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  message TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `);
 
 function safeAddColumn(sql) {
@@ -74,7 +82,7 @@ function safeAddColumn(sql) {
 safeAddColumn(`ALTER TABLE users ADD COLUMN password_hash TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN session_token TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN session_expires_at TEXT`);
-safeAddColumn(`ALTER TABLE users ADD COLUMN free_credits_remaining INTEGER NOT NULL DEFAULT 3`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN free_credits_remaining INTEGER NOT NULL DEFAULT 5`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN auth_provider TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN google_sub TEXT`);
@@ -186,6 +194,16 @@ const setPasswordHashStmt = db.prepare(`
       updated_at = CURRENT_TIMESTAMP
   WHERE id = ?
 `);
+const insertFeedbackStmt = db.prepare(`
+  INSERT INTO feedback_posts (email, topic, message)
+  VALUES (?, ?, ?)
+`);
+const listFeedbackStmt = db.prepare(`
+  SELECT id, email, topic, message, created_at
+  FROM feedback_posts
+  ORDER BY id DESC
+  LIMIT ?
+`);
 const setSessionStmt = db.prepare(`
   UPDATE users
   SET session_token = ?,
@@ -218,9 +236,15 @@ const linkGoogleAccountStmt = db.prepare(`
 `);
 const normalizeLegacyFreeCreditsStmt = db.prepare(`
   UPDATE users
-  SET free_credits_remaining = 3,
+  SET free_credits_remaining = 5,
       updated_at = CURRENT_TIMESTAMP
-  WHERE plan_id = 'free' AND free_credits_remaining > 3
+  WHERE plan_id = 'free' AND free_credits_remaining > 5
+`);
+const upliftLegacyFreeCreditsStmt = db.prepare(`
+  UPDATE users
+  SET free_credits_remaining = 5,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE plan_id = 'free' AND free_credits_remaining < 5
 `);
 
 function createApiKey() {
@@ -234,6 +258,7 @@ function monthKey(date = new Date()) {
 }
 
 normalizeLegacyFreeCreditsStmt.run();
+upliftLegacyFreeCreditsStmt.run();
 
 export function createOrGetUser(email) {
   const normalized = String(email || "").trim().toLowerCase();
@@ -365,4 +390,13 @@ export function consumeFreeCredit(userId) {
 export function linkGoogleAccount(userId, { googleSub, googleName, googlePicture }) {
   linkGoogleAccountStmt.run(googleSub, googleName || null, googlePicture || null, userId);
   return getUserByIdStmt.get(userId);
+}
+
+
+export function createFeedback({ email, topic, message }) {
+  insertFeedbackStmt.run(String(email || "").trim().toLowerCase(), String(topic || "").trim(), String(message || "").trim());
+}
+
+export function listFeedback(limit = 200) {
+  return listFeedbackStmt.all(Number(limit) || 200);
 }

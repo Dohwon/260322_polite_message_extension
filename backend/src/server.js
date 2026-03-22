@@ -10,6 +10,7 @@ import {
   addUsage,
   clearUserSession,
   consumeFreeCredit,
+  createFeedback,
   createTossOrder,
   createOrGetUser,
   dbHealth,
@@ -20,6 +21,7 @@ import {
   getUserByGoogleSub,
   getUserBySessionToken,
   linkGoogleAccount,
+  listFeedback,
   markTossOrderPaid,
   setUserSession,
   updatePlan
@@ -84,6 +86,24 @@ function createSession(userId, rememberMe) {
 
 function createNonce(prefix) {
   return `${prefix}_${crypto.randomBytes(24).toString("hex")}`;
+}
+
+function requestBaseUrl(req) {
+  const appBase = String(env.appBaseUrl || "").trim();
+  if (appBase && !appBase.includes("localhost")) {
+    return appBase.replace(/\/+$/, "");
+  }
+  const forwardedProto = String(req.header("x-forwarded-proto") || "").split(",")[0].trim();
+  const proto = forwardedProto || req.protocol || "https";
+  const host = String(req.header("x-forwarded-host") || req.header("host") || "").split(",")[0].trim();
+  if (host) {
+    return `${proto}://${host}`.replace(/\/+$/, "");
+  }
+  return "http://localhost:4310";
+}
+
+function googleRedirectUri(req) {
+  return env.googleRedirectUri || `${requestBaseUrl(req)}/api/auth/google/callback`;
 }
 
 function safeHtml(text) {
@@ -232,7 +252,7 @@ app.get("/api/auth/google/start", (req, res) => {
   const state = createNonce("go");
   oauthPendingStates.set(state, { deviceId, expiresAtMs: Date.now() + 10 * 60 * 1000 });
 
-  const redirectUri = env.googleRedirectUri || `${env.appBaseUrl}/api/auth/google/callback`;
+  const redirectUri = googleRedirectUri(req);
   const params = new URLSearchParams({
     client_id: env.googleClientId,
     redirect_uri: redirectUri,
@@ -245,14 +265,14 @@ app.get("/api/auth/google/start", (req, res) => {
   return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
 });
 
-app.get("/api/auth/google/config", (_req, res) => {
+app.get("/api/auth/google/config", (req, res) => {
   const missing = [];
   if (!env.googleClientId) missing.push("GOOGLE_CLIENT_ID");
   if (!env.googleClientSecret) missing.push("GOOGLE_CLIENT_SECRET");
-  if (!env.googleRedirectUri && !env.appBaseUrl) missing.push("GOOGLE_REDIRECT_URI");
+  if (!env.googleRedirectUri && !requestBaseUrl(req)) missing.push("GOOGLE_REDIRECT_URI");
   return res.json({
     enabled: googleAuthEnabled,
-    redirectUri: env.googleRedirectUri || `${env.appBaseUrl}/api/auth/google/callback`,
+    redirectUri: googleRedirectUri(req),
     missing
   });
 });
@@ -272,7 +292,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
   }
 
   try {
-    const redirectUri = env.googleRedirectUri || `${env.appBaseUrl}/api/auth/google/callback`;
+    const redirectUri = googleRedirectUri(req);
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -376,6 +396,54 @@ app.get("/api/payments", auth, (req, res) => {
   return res.json({ items: getTossOrdersByUser(req.user.id) });
 });
 
+app.post("/api/feedback", async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const topic = String(req.body?.topic || "").trim();
+  const message = String(req.body?.message || "").trim();
+  if (!email || !email.includes("@")) {
+    return res.status(400).json({ error: "유효한 이메일을 입력해 주세요." });
+  }
+  if (!topic || topic.length < 2) {
+    return res.status(400).json({ error: "문의 주제를 입력해 주세요." });
+  }
+  if (!message || message.length < 6) {
+    return res.status(400).json({ error: "문의 내용을 6자 이상 입력해 주세요." });
+  }
+  createFeedback({ email, topic, message });
+  return res.json({ ok: true });
+});
+
+app.get("/admin/feedback", (req, res) => {
+  const key = String(req.query.key || "").trim();
+  if (!env.adminViewKey || key !== env.adminViewKey) {
+    return res.status(401).send("Unauthorized");
+  }
+  const rows = listFeedback(500);
+  const items = rows
+    .map((row) => {
+      return `<tr>
+        <td>${safeHtml(row.created_at)}</td>
+        <td>${safeHtml(row.email)}</td>
+        <td>${safeHtml(row.topic)}</td>
+        <td>${safeHtml(row.message)}</td>
+      </tr>`;
+    })
+    .join("");
+  return res.type("html").send(`<!doctype html>
+  <html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Feedback Admin</title>
+  <style>
+  body{font-family:Pretendard,'Noto Sans KR',sans-serif;margin:24px;color:#1b2230}
+  table{width:100%;border-collapse:collapse}
+  th,td{border:1px solid #d9deea;padding:8px;vertical-align:top;text-align:left;font-size:13px}
+  th{background:#f3f6ff}
+  </style></head><body>
+  <h1>고객 문의 게시판(관리자용)</h1>
+  <p>총 ${rows.length}건</p>
+  <table><thead><tr><th>접수시각</th><th>이메일</th><th>주제</th><th>내용</th></tr></thead><tbody>${items}</tbody></table>
+  </body></html>`);
+});
+
 app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   if (!openai) {
     return res.status(500).json({ error: "OPENAI_API_KEY가 설정되지 않았습니다." });
@@ -403,7 +471,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   if (user.plan_id === "free") {
     if ((user.free_credits_remaining ?? 0) <= 0) {
       return res.status(402).json({
-        error: "무료 3회를 모두 사용했습니다. Pro 플랜으로 업그레이드해 주세요."
+        error: "무료 사용량을 모두 사용했습니다. 요금제 페이지에서 업그레이드해 주세요."
       });
     }
   } else {
@@ -504,7 +572,7 @@ app.post("/api/billing/create-checkout", auth, async (req, res) => {
     amount: plan.billingCycle === "annual" ? plan.yearlyPriceKrw : plan.monthlyPriceKrw
   });
   return res.json({
-    checkoutUrl: `${env.appBaseUrl}/billing/toss/checkout?orderId=${encodeURIComponent(orderId)}`,
+    checkoutUrl: `${requestBaseUrl(req)}/billing/toss/checkout?orderId=${encodeURIComponent(orderId)}`,
     orderId
   });
 });
@@ -524,8 +592,9 @@ app.get("/billing/toss/checkout", (req, res) => {
     : "Polite Message Rewriter 이용권";
 
   const customerKey = `user_${order.user_id}`;
-  const successUrl = `${env.appBaseUrl}/billing/toss/success?orderId=${encodeURIComponent(order.order_id)}`;
-  const failUrl = `${env.appBaseUrl}/billing/toss/fail?orderId=${encodeURIComponent(order.order_id)}`;
+  const baseUrl = requestBaseUrl(req);
+  const successUrl = `${baseUrl}/billing/toss/success?orderId=${encodeURIComponent(order.order_id)}`;
+  const failUrl = `${baseUrl}/billing/toss/fail?orderId=${encodeURIComponent(order.order_id)}`;
 
   const html = `<!doctype html>
   <html lang="ko">
@@ -549,7 +618,7 @@ app.get("/billing/toss/checkout", (req, res) => {
       <p><b>결제금액:</b> ${order.amount.toLocaleString("ko-KR")}원</p>
       <p><b>포함 내용</b></p>
       <ul>
-        <li>Free: 총 3회 체험, 1회 2,000자</li>
+        <li>Free: 총 5회 체험, 월 토큰 한도 100</li>
         <li>Pro Monthly: 월 50회, 1회 4,000자</li>
         <li>Pro Annual: 매달 100회, 1회 4,000자</li>
         <li>로그인은 Google 계정만 지원합니다.</li>

@@ -14,6 +14,7 @@ export const env = {
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
+  adminViewKey: process.env.ADMIN_VIEW_KEY || "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
   billingCurrency: process.env.BILLING_CURRENCY || "krw"
@@ -29,10 +30,10 @@ export const PLANS = {
     monthlyPriceKrw: 0,
     yearlyPriceKrw: 0,
     billingCycle: "trial",
-    maxMonthlyRequests: 3,
-    maxMonthlyInputTokens: 24000,
-    maxMonthlyOutputTokens: 18000,
-    maxCharsPerRequest: 2000,
+    maxMonthlyRequests: 5,
+    maxMonthlyInputTokens: 100,
+    maxMonthlyOutputTokens: 100,
+    maxCharsPerRequest: 1000,
     model: env.openaiFreeModel
   },
   pro_monthly: {
