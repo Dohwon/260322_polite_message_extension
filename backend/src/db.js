@@ -76,6 +76,10 @@ safeAddColumn(`ALTER TABLE users ADD COLUMN session_token TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN session_expires_at TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN free_credits_remaining INTEGER NOT NULL DEFAULT 5`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN auth_provider TEXT`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN google_sub TEXT`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN google_name TEXT`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN google_picture TEXT`);
 
 const insertUserStmt = db.prepare(`
   INSERT INTO users (email, api_key)
@@ -89,6 +93,9 @@ const getUserBySessionTokenStmt = db.prepare(`
   SELECT * FROM users
   WHERE session_token = ?
     AND (session_expires_at IS NULL OR session_expires_at > CURRENT_TIMESTAMP)
+`);
+const getUserByGoogleSubStmt = db.prepare(`
+  SELECT * FROM users WHERE google_sub = ?
 `);
 
 const upsertMonthlyStmt = db.prepare(`
@@ -200,6 +207,15 @@ const consumeFreeCreditStmt = db.prepare(`
       updated_at = CURRENT_TIMESTAMP
   WHERE id = ? AND free_credits_remaining > 0
 `);
+const linkGoogleAccountStmt = db.prepare(`
+  UPDATE users
+  SET auth_provider = 'google',
+      google_sub = ?,
+      google_name = ?,
+      google_picture = ?,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ?
+`);
 
 function createApiKey() {
   return `pm_${crypto.randomBytes(20).toString("hex")}`;
@@ -241,6 +257,11 @@ export function getUserByEmail(email) {
 export function getUserBySessionToken(token) {
   if (!token) return null;
   return getUserBySessionTokenStmt.get(token);
+}
+
+export function getUserByGoogleSub(googleSub) {
+  if (!googleSub) return null;
+  return getUserByGoogleSubStmt.get(googleSub);
 }
 
 export function ensureMonthlyUsage(userId, key = monthKey()) {
@@ -331,4 +352,9 @@ export function clearUserSession(userId) {
 export function consumeFreeCredit(userId) {
   const info = consumeFreeCreditStmt.run(userId);
   return info.changes > 0;
+}
+
+export function linkGoogleAccount(userId, { googleSub, googleName, googlePicture }) {
+  linkGoogleAccountStmt.run(googleSub, googleName || null, googlePicture || null, userId);
+  return getUserByIdStmt.get(userId);
 }

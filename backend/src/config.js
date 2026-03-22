@@ -11,11 +11,9 @@ export const env = {
   openaiFreeModel: process.env.OPENAI_FREE_MODEL || "gpt-5-nano",
   openaiChatFallbackModel: process.env.OPENAI_CHAT_FALLBACK_MODEL || "",
   openaiTimeoutMs: Number(process.env.OPENAI_TIMEOUT_MS || 20000),
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
-  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
-  stripePriceProMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY || "",
-  stripePriceBusinessMonthly: process.env.STRIPE_PRICE_BUSINESS_MONTHLY || "",
-  stripePriceTopup10: process.env.STRIPE_PRICE_TOPUP_10 || process.env.STRIPE_PRICE_TOPUP_500 || "",
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
   billingCurrency: process.env.BILLING_CURRENCY || "krw"
 };
 
@@ -27,40 +25,38 @@ export const PLANS = {
     id: "free",
     name: "Free",
     monthlyPriceKrw: 0,
-    maxMonthlyRequests: 5,
-    maxMonthlyInputTokens: 30000,
-    maxMonthlyOutputTokens: 22000,
-    maxCharsPerRequest: 1200,
+    yearlyPriceKrw: 0,
+    billingCycle: "trial",
+    maxMonthlyRequests: 3,
+    maxMonthlyInputTokens: 24000,
+    maxMonthlyOutputTokens: 18000,
+    maxCharsPerRequest: 2000,
     model: env.openaiFreeModel
   },
-  pro: {
-    id: "pro",
-    name: "Pro",
-    monthlyPriceKrw: 6900,
-    maxMonthlyRequests: 100,
-    maxMonthlyInputTokens: 600000,
-    maxMonthlyOutputTokens: 360000,
-    maxCharsPerRequest: 3200,
+  pro_monthly: {
+    id: "pro_monthly",
+    name: "Pro Monthly",
+    monthlyPriceKrw: 4900,
+    yearlyPriceKrw: null,
+    billingCycle: "monthly",
+    maxMonthlyRequests: 50,
+    maxMonthlyInputTokens: 320000,
+    maxMonthlyOutputTokens: 220000,
+    maxCharsPerRequest: 4000,
     model: env.openaiDefaultModel
   },
-  business: {
-    id: "business",
-    name: "Business",
-    monthlyPriceKrw: 19900,
-    maxMonthlyRequests: null,
-    maxMonthlyInputTokens: null,
-    maxMonthlyOutputTokens: null,
-    maxCharsPerRequest: 5000,
+  pro_annual: {
+    id: "pro_annual",
+    name: "Pro Annual",
+    monthlyPriceKrw: 3250,
+    yearlyPriceKrw: 39000,
+    billingCycle: "annual",
+    maxMonthlyRequests: 100,
+    maxMonthlyInputTokens: 640000,
+    maxMonthlyOutputTokens: 440000,
+    maxCharsPerRequest: 4000,
     model: env.openaiDefaultModel
   }
-};
-
-export const TOPUP = {
-  id: "topup10",
-  name: "추가 10회",
-  requests: 10,
-  priceKrw: 1000,
-  stripePriceId: env.stripePriceTopup10
 };
 
 export const TONES = ["친근하게", "정중하게", "아주 정중하게", "캐주얼하게", "공손하지만 단호하게"];

@@ -19,15 +19,14 @@ import {
   ensureMonthlyUsage,
   getTossOrdersByUser,
   getTossOrderByOrderId,
-  getUserByEmail,
   getCurrentMonthlyUsage,
-  getUserByApiKey,
+  getUserByGoogleSub,
   getUserBySessionToken,
   getUserByStripeCustomer,
   hasBillingEvent,
   insertBillingEvent,
+  linkGoogleAccount,
   markTossOrderPaid,
-  setPasswordHash,
   setUserSession,
   updatePlan,
   updateStripeCustomer
@@ -43,9 +42,12 @@ const openai = env.openaiApiKey
 
 const stripe = env.stripeSecretKey ? new Stripe(env.stripeSecretKey) : null;
 const tossEnabled = Boolean(env.tossClientKey && env.tossSecretKey);
+const googleAuthEnabled = Boolean(env.googleClientId && env.googleClientSecret);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const plansLandingPath = path.join(__dirname, "plans-landing.html");
+const oauthPendingStates = new Map();
+const oauthDeviceResults = new Map();
 
 function extractResponseText(response) {
   if (typeof response?.output_text === "string" && response.output_text.trim()) {
@@ -81,24 +83,43 @@ function nowPlusDays(days) {
   return d.toISOString().slice(0, 19).replace("T", " ");
 }
 
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${hash}`;
-}
-
-function verifyPassword(password, stored) {
-  if (!stored || !stored.includes(":")) return false;
-  const [salt, oldHash] = stored.split(":");
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
-  return crypto.timingSafeEqual(Buffer.from(oldHash, "hex"), Buffer.from(hash, "hex"));
-}
-
 function createSession(userId, rememberMe) {
   return {
     token: `st_${crypto.randomBytes(24).toString("hex")}_${userId}`,
     expiresAt: nowPlusDays(rememberMe ? 30 : 1)
   };
+}
+
+function createNonce(prefix) {
+  return `${prefix}_${crypto.randomBytes(24).toString("hex")}`;
+}
+
+function safeHtml(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderSimplePage(title, body) {
+  return `<!doctype html>
+  <html lang="ko">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>${safeHtml(title)}</title>
+      <style>
+        body { font-family: Pretendard, 'Noto Sans KR', sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; color: #1a1d2a; line-height: 1.65; }
+        h1 { margin-bottom: 12px; }
+        .card { border: 1px solid #d6dcef; border-radius: 12px; padding: 18px; background: #fff; }
+      </style>
+    </head>
+    <body>
+      <h1>${safeHtml(title)}</h1>
+      <div class="card">${body}</div>
+    </body>
+  </html>`;
 }
 
 function usageSummary(user, monthly) {
@@ -122,6 +143,16 @@ function usageSummary(user, monthly) {
       freeCreditsTotal: 5
     }
   };
+}
+
+function cleanupOauthCache() {
+  const now = Date.now();
+  for (const [state, row] of oauthPendingStates.entries()) {
+    if (row.expiresAtMs < now) oauthPendingStates.delete(state);
+  }
+  for (const [deviceId, row] of oauthDeviceResults.entries()) {
+    if (row.expiresAtMs < now) oauthDeviceResults.delete(deviceId);
+  }
 }
 
 const rewriteLimiter = rateLimit({
@@ -249,63 +280,140 @@ app.get("/api/meta", (_req, res) => {
       provider: tossEnabled ? "toss" : "plans-only",
       hasPlanPrices: true,
       hasTopupPrice: true
+    },
+    auth: {
+      provider: "google",
+      googleEnabled: googleAuthEnabled
     }
   });
 });
 
-app.post("/api/auth/signup", (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
-  const rememberMe = Boolean(req.body?.rememberMe);
-  if (!email || !email.includes("@") || password.length < 6) {
-    return res.status(400).json({ error: "이메일/비밀번호(6자 이상)를 확인해 주세요." });
-  }
-
-  const user = createOrGetUser(email);
-  if (user.password_hash) {
-    return res.status(409).json({ error: "이미 가입된 이메일입니다. 로그인해 주세요." });
-  }
-  setPasswordHash(user.id, hashPassword(password));
-  const session = createSession(user.id, rememberMe);
-  const updatedUser = setUserSession(user.id, session.token, session.expiresAt);
-  const monthly = ensureMonthlyUsage(updatedUser.id);
-  return res.json({
-    sessionToken: session.token,
-    email: updatedUser.email,
-    ...usageSummary(updatedUser, monthly)
-  });
+app.post("/api/auth/signup", (_req, res) => {
+  return res.status(410).json({ error: "이메일 회원가입은 중단되었습니다. Google 로그인만 지원합니다." });
 });
 
-app.post("/api/auth/login", (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
-  const rememberMe = Boolean(req.body?.rememberMe);
-  const user = getUserByEmail(email);
-  if (!user || !verifyPassword(password, user.password_hash || "")) {
-    return res.status(401).json({ error: "이메일 또는 비밀번호가 올바르지 않습니다." });
-  }
-  const session = createSession(user.id, rememberMe);
-  const updatedUser = setUserSession(user.id, session.token, session.expiresAt);
-  const monthly = ensureMonthlyUsage(updatedUser.id);
-  return res.json({
-    sessionToken: session.token,
-    email: updatedUser.email,
-    ...usageSummary(updatedUser, monthly)
-  });
+app.post("/api/auth/login", (_req, res) => {
+  return res.status(410).json({ error: "이메일 로그인은 중단되었습니다. Google 로그인만 지원합니다." });
 });
 
-app.post("/api/auth/register", (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
-  if (!email || !email.includes("@")) {
-    return res.status(400).json({ error: "유효한 이메일을 입력해 주세요." });
+app.post("/api/auth/register", (_req, res) => {
+  return res.status(410).json({ error: "이메일 가입은 중단되었습니다. Google 로그인만 지원합니다." });
+});
+
+app.get("/api/auth/google/start", (req, res) => {
+  if (!googleAuthEnabled) {
+    return res.status(500).send("Google OAuth 환경변수가 설정되지 않았습니다.");
   }
-  const user = createOrGetUser(email);
-  const monthly = ensureMonthlyUsage(user.id);
-  return res.json({
-    apiKey: user.api_key, // legacy fallback
-    email: user.email,
-    ...usageSummary(user, monthly)
+
+  cleanupOauthCache();
+  const deviceId = String(req.query.deviceId || "").trim();
+  if (!/^[a-zA-Z0-9_-]{12,120}$/.test(deviceId)) {
+    return res.status(400).send("유효하지 않은 로그인 요청입니다. 익스텐션에서 다시 시도해 주세요.");
+  }
+
+  const state = createNonce("go");
+  oauthPendingStates.set(state, { deviceId, expiresAtMs: Date.now() + 10 * 60 * 1000 });
+
+  const redirectUri = env.googleRedirectUri || `${env.appBaseUrl}/api/auth/google/callback`;
+  const params = new URLSearchParams({
+    client_id: env.googleClientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    state,
+    access_type: "offline",
+    prompt: "select_account"
   });
+  return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+
+app.get("/api/auth/google/callback", async (req, res) => {
+  if (!googleAuthEnabled) {
+    return res.status(500).send("Google OAuth 환경변수가 설정되지 않았습니다.");
+  }
+
+  cleanupOauthCache();
+  const state = String(req.query.state || "").trim();
+  const code = String(req.query.code || "").trim();
+  const pending = oauthPendingStates.get(state);
+  oauthPendingStates.delete(state);
+  if (!pending || !code) {
+    return res.status(400).send("로그인 세션이 만료되었거나 잘못된 요청입니다. 다시 로그인해 주세요.");
+  }
+
+  try {
+    const redirectUri = env.googleRedirectUri || `${env.appBaseUrl}/api/auth/google/callback`;
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: env.googleClientId,
+        client_secret: env.googleClientSecret,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code"
+      })
+    });
+    const tokenJson = await tokenRes.json();
+    if (!tokenRes.ok || !tokenJson.id_token) {
+      return res.status(400).send("Google 토큰 발급에 실패했습니다.");
+    }
+
+    const verifyRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(tokenJson.id_token)}`
+    );
+    const profile = await verifyRes.json();
+    if (!verifyRes.ok || profile.aud !== env.googleClientId || profile.email_verified !== "true") {
+      return res.status(401).send("Google 계정 검증에 실패했습니다.");
+    }
+
+    const email = String(profile.email || "").trim().toLowerCase();
+    const googleSub = String(profile.sub || "").trim();
+    if (!email || !googleSub) {
+      return res.status(400).send("Google 계정 정보가 올바르지 않습니다.");
+    }
+
+    let user = getUserByGoogleSub(googleSub);
+    if (!user) {
+      user = createOrGetUser(email);
+      user = linkGoogleAccount(user.id, {
+        googleSub,
+        googleName: profile.name || "",
+        googlePicture: profile.picture || ""
+      });
+    }
+
+    const session = createSession(user.id, true);
+    const updatedUser = setUserSession(user.id, session.token, session.expiresAt);
+    const monthly = ensureMonthlyUsage(updatedUser.id);
+    oauthDeviceResults.set(pending.deviceId, {
+      expiresAtMs: Date.now() + 5 * 60 * 1000,
+      payload: {
+        sessionToken: session.token,
+        email: updatedUser.email,
+        ...usageSummary(updatedUser, monthly)
+      }
+    });
+
+    return res.type("html").send(
+      renderSimplePage(
+        "Google 로그인 완료",
+        "<p>로그인이 완료되었습니다. 확장 프로그램으로 돌아가면 자동으로 연결됩니다.</p><p>이 창은 닫으셔도 됩니다.</p>"
+      )
+    );
+  } catch (err) {
+    return res.status(500).send(`Google 로그인 처리 중 오류가 발생했습니다: ${safeHtml(err?.message || "unknown")}`);
+  }
+});
+
+app.get("/api/auth/google/poll", (req, res) => {
+  cleanupOauthCache();
+  const deviceId = String(req.query.deviceId || "").trim();
+  if (!deviceId) return res.status(400).json({ error: "deviceId가 필요합니다." });
+  const item = oauthDeviceResults.get(deviceId);
+  if (!item) return res.status(202).json({ status: "pending" });
+  oauthDeviceResults.delete(deviceId);
+  return res.json({ ok: true, ...item.payload });
 });
 
 function auth(req, res, next) {
@@ -316,13 +424,7 @@ function auth(req, res, next) {
     req.user = userBySession;
     return next();
   }
-
-  const apiKey = String(req.header("x-api-key") || "").trim();
-  if (!apiKey) return res.status(401).json({ error: "로그인이 필요합니다." });
-  const user = getUserByApiKey(apiKey);
-  if (!user) return res.status(401).json({ error: "유효하지 않은 API 키입니다." });
-  req.user = user;
-  return next();
+  return res.status(401).json({ error: "Google 로그인이 필요합니다." });
 }
 
 app.get("/api/me", auth, (req, res) => {
@@ -438,7 +540,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
     if (user.plan_id === "free") {
       consumeFreeCredit(user.id);
     }
-    const refreshedUser = getUserByApiKey(user.api_key) || req.user;
+    const refreshedUser = req.user;
 
     if (!rewritten) {
       return res.status(502).json({ error: "변환 결과를 생성하지 못했습니다. 다시 시도해 주세요." });
@@ -610,6 +712,60 @@ app.get("/billing/return", (_req, res) => {
 
 app.get("/billing/plans", (_req, res) => {
   res.sendFile(plansLandingPath);
+});
+
+app.get("/legal/privacy", (_req, res) => {
+  res.type("html").send(
+    renderSimplePage(
+      "Privacy Policy",
+      `
+      <p>Polite Message Rewriter는 서비스 제공을 위해 최소한의 정보(로그인 식별자, 사용량 정보, 결제 기록)를 처리합니다.</p>
+      <p>메시지 변환 요청 내용은 품질 개선 목적의 장기 저장을 기본으로 하지 않으며, 운영 안정성 목적의 제한적 로그만 보관할 수 있습니다.</p>
+      <p>문의: support@polite-message.app</p>
+      <p>시행일: 2026-03-23</p>
+      `
+    )
+  );
+});
+
+app.get("/legal/terms", (_req, res) => {
+  res.type("html").send(
+    renderSimplePage(
+      "Terms of Service",
+      `
+      <p>본 서비스는 사용자가 입력한 문장을 선택한 톤으로 재작성하는 도구입니다.</p>
+      <p>서비스 악용, 불법 콘텐츠 생성, 타인 권리 침해 행위는 금지됩니다.</p>
+      <p>요금제는 Free/Pro/Business 정책에 따르며, 결제 조건은 결제 페이지 안내를 우선합니다.</p>
+      <p>시행일: 2026-03-23</p>
+      `
+    )
+  );
+});
+
+app.get("/legal/contact", (_req, res) => {
+  res.type("html").send(
+    renderSimplePage(
+      "Contact Us",
+      `
+      <p>서비스 문의 및 제휴 문의는 아래 채널로 접수해 주세요.</p>
+      <p>Email: support@polite-message.app</p>
+      <p>운영시간: 평일 10:00 ~ 18:00 (KST)</p>
+      `
+    )
+  );
+});
+
+app.get("/legal/cookies", (_req, res) => {
+  res.type("html").send(
+    renderSimplePage(
+      "Cookie Settings",
+      `
+      <p>본 서비스는 로그인 세션 유지를 위한 필수 쿠키(또는 동등 기술)를 사용할 수 있습니다.</p>
+      <p>광고 추적 목적의 제3자 쿠키는 기본 활성화하지 않습니다.</p>
+      <p>브라우저 설정에서 쿠키를 차단할 경우 일부 기능이 제한될 수 있습니다.</p>
+      `
+    )
+  );
 });
 
 app.listen(env.port, () => {
