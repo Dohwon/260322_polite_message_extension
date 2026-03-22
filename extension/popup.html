@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Polite Rewriter</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Polite Rewriter</h1>
+
+      <button id="connectBtn" class="ghost">시작하기</button>
+
+      <label>분위기</label>
+      <select id="tone">
+        <option>친근하게</option>
+        <option selected>정중하게</option>
+        <option>아주 정중하게</option>
+        <option>캐주얼하게</option>
+        <option>공손하지만 단호하게</option>
+      </select>
+
+      <label>보내는 대상</label>
+      <select id="recipient">
+        <option>상사</option>
+        <option>동료</option>
+        <option>친구</option>
+        <option>학부모</option>
+        <option>고객</option>
+        <option>거래처</option>
+        <option>연인</option>
+        <option>가족</option>
+        <option selected>기타</option>
+      </select>
+
+      <label>본인 역할</label>
+      <input id="senderRole" type="text" placeholder="예: 담임교사" />
+
+      <label>원본 문자</label>
+      <textarea id="originalText" rows="7" placeholder="여기에 원본 문장을 입력하세요"></textarea>
+
+      <div class="actions">
+        <button id="rewriteBtn">변환하기</button>
+        <button id="copyBtn" class="ghost">복사</button>
+      </div>
+
+      <label>변환 문자</label>
+      <textarea id="rewrittenText" rows="8" readonly></textarea>
+
+      <p id="status" class="status"></p>
+
+      <div class="actions secondary">
+        <button id="proBtn" class="ghost">Pro 구독</button>
+        <button id="businessBtn" class="ghost">Business 구독</button>
+        <button id="topupBtn" class="ghost">+10회 충전</button>
+      </div>
+
+      <small>
+        API 키는 내부 저장되며 직접 입력할 필요가 없습니다. 이메일로 연결 버튼을 눌러 시작하세요.
+      </small>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,202 @@
+import Database from "better-sqlite3";
+import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dbPath = path.join(__dirname, "..", "data.sqlite");
+
+const db = new Database(dbPath);
+db.pragma("journal_mode = WAL");
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE NOT NULL,
+  api_key TEXT UNIQUE NOT NULL,
+  plan_id TEXT NOT NULL DEFAULT 'free',
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  subscription_status TEXT,
+  bonus_requests_remaining INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS monthly_usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  month_key TEXT NOT NULL,
+  request_count INTEGER NOT NULL DEFAULT 0,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, month_key),
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS billing_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  stripe_event_id TEXT UNIQUE,
+  user_id INTEGER,
+  event_type TEXT NOT NULL,
+  payload TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
+const insertUserStmt = db.prepare(`
+  INSERT INTO users (email, api_key)
+  VALUES (?, ?)
+`);
+
+const getUserByEmailStmt = db.prepare(`SELECT * FROM users WHERE email = ?`);
+const getUserByApiKeyStmt = db.prepare(`SELECT * FROM users WHERE api_key = ?`);
+const getUserByIdStmt = db.prepare(`SELECT * FROM users WHERE id = ?`);
+
+const upsertMonthlyStmt = db.prepare(`
+  INSERT INTO monthly_usage (user_id, month_key)
+  VALUES (?, ?)
+  ON CONFLICT(user_id, month_key) DO NOTHING
+`);
+
+const getMonthlyStmt = db.prepare(`
+  SELECT * FROM monthly_usage
+  WHERE user_id = ? AND month_key = ?
+`);
+
+const addUsageStmt = db.prepare(`
+  UPDATE monthly_usage
+  SET request_count = request_count + 1,
+      input_tokens = input_tokens + ?,
+      output_tokens = output_tokens + ?,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE user_id = ? AND month_key = ?
+`);
+
+const decBonusStmt = db.prepare(`
+  UPDATE users
+  SET bonus_requests_remaining = bonus_requests_remaining - 1,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ? AND bonus_requests_remaining > 0
+`);
+
+const addBonusStmt = db.prepare(`
+  UPDATE users
+  SET bonus_requests_remaining = bonus_requests_remaining + ?,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ?
+`);
+
+const updatePlanStmt = db.prepare(`
+  UPDATE users
+  SET plan_id = ?,
+      stripe_customer_id = ?,
+      stripe_subscription_id = ?,
+      subscription_status = ?,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ?
+`);
+
+const updateStripeCustomerStmt = db.prepare(`
+  UPDATE users
+  SET stripe_customer_id = ?,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ?
+`);
+
+const getUserByStripeCustomerStmt = db.prepare(`
+  SELECT * FROM users WHERE stripe_customer_id = ?
+`);
+
+const insertBillingEventStmt = db.prepare(`
+  INSERT INTO billing_events (stripe_event_id, user_id, event_type, payload)
+  VALUES (?, ?, ?, ?)
+`);
+
+const hasBillingEventStmt = db.prepare(`SELECT id FROM billing_events WHERE stripe_event_id = ?`);
+
+function createApiKey() {
+  return `pm_${crypto.randomBytes(20).toString("hex")}`;
+}
+
+function monthKey(date = new Date()) {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+export function createOrGetUser(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) {
+    throw new Error("유효한 이메일이 필요합니다.");
+  }
+  const found = getUserByEmailStmt.get(normalized);
+  if (found) return found;
+  const apiKey = createApiKey();
+  const info = insertUserStmt.run(normalized, apiKey);
+  return getUserByIdStmt.get(info.lastInsertRowid);
+}
+
+export function getUserByApiKey(apiKey) {
+  if (!apiKey) return null;
+  return getUserByApiKeyStmt.get(apiKey);
+}
+
+export function getUserById(id) {
+  return getUserByIdStmt.get(id);
+}
+
+export function ensureMonthlyUsage(userId, key = monthKey()) {
+  upsertMonthlyStmt.run(userId, key);
+  return getMonthlyStmt.get(userId, key);
+}
+
+export function getCurrentMonthlyUsage(userId) {
+  return ensureMonthlyUsage(userId, monthKey());
+}
+
+export function addUsage(userId, inputTokens, outputTokens) {
+  const key = monthKey();
+  upsertMonthlyStmt.run(userId, key);
+  addUsageStmt.run(inputTokens, outputTokens, userId, key);
+  return getMonthlyStmt.get(userId, key);
+}
+
+export function consumeBonusRequest(userId) {
+  const info = decBonusStmt.run(userId);
+  return info.changes > 0;
+}
+
+export function addBonusRequests(userId, amount) {
+  addBonusStmt.run(amount, userId);
+  return getUserByIdStmt.get(userId);
+}
+
+export function updatePlan({ userId, planId, stripeCustomerId, stripeSubscriptionId, subscriptionStatus }) {
+  updatePlanStmt.run(planId, stripeCustomerId || null, stripeSubscriptionId || null, subscriptionStatus || null, userId);
+  return getUserByIdStmt.get(userId);
+}
+
+export function updateStripeCustomer(userId, stripeCustomerId) {
+  updateStripeCustomerStmt.run(stripeCustomerId, userId);
+  return getUserByIdStmt.get(userId);
+}
+
+export function getUserByStripeCustomer(customerId) {
+  return getUserByStripeCustomerStmt.get(customerId);
+}
+
+export function hasBillingEvent(stripeEventId) {
+  return Boolean(hasBillingEventStmt.get(stripeEventId));
+}
+
+export function insertBillingEvent({ stripeEventId, userId, eventType, payload }) {
+  insertBillingEventStmt.run(stripeEventId, userId || null, eventType, JSON.stringify(payload || {}));
+}
+
+export function dbHealth() {
+  return { ok: true, path: dbPath };
+}
