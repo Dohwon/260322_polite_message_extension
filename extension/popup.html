@@ -8,57 +8,84 @@
   </head>
   <body>
     <main class="wrap">
-      <h1>Polite Rewriter</h1>
+      <header>
+        <h1>Polite Rewriter</h1>
+        <p class="sub">처음 가입 시 무료 5회가 자동 제공됩니다.</p>
+      </header>
 
-      <button id="connectBtn" class="ghost">시작하기</button>
+      <section class="card auth-card">
+        <label for="email">이메일</label>
+        <input id="email" type="email" placeholder="you@example.com" autocomplete="email" />
+        <p id="emailError" class="field-error"></p>
 
-      <label>분위기</label>
-      <select id="tone">
-        <option>친근하게</option>
-        <option selected>정중하게</option>
-        <option>아주 정중하게</option>
-        <option>캐주얼하게</option>
-        <option>공손하지만 단호하게</option>
-      </select>
+        <label for="password">비밀번호</label>
+        <input id="password" type="password" placeholder="6자 이상" autocomplete="current-password" />
+        <p id="passwordError" class="field-error"></p>
 
-      <label>보내는 대상</label>
-      <select id="recipient">
-        <option>상사</option>
-        <option>동료</option>
-        <option>친구</option>
-        <option>학부모</option>
-        <option>고객</option>
-        <option>거래처</option>
-        <option>연인</option>
-        <option>가족</option>
-        <option selected>기타</option>
-      </select>
+        <label class="inline" for="rememberMe">
+          <input id="rememberMe" type="checkbox" />
+          로그인 유지
+        </label>
 
-      <label>본인 역할</label>
-      <input id="senderRole" type="text" placeholder="예: 담임교사" />
+        <div class="actions">
+          <button id="loginBtn" type="button">로그인</button>
+          <button id="signupBtn" type="button" class="ghost">회원가입</button>
+        </div>
+        <p id="authStatus" class="mini-status"></p>
 
-      <label>원본 문자</label>
-      <textarea id="originalText" rows="7" placeholder="여기에 원본 문장을 입력하세요"></textarea>
+        <div class="actions" id="logoutWrap">
+          <button id="logoutBtn" type="button" class="ghost">로그아웃</button>
+        </div>
+      </section>
 
-      <div class="actions">
-        <button id="rewriteBtn">변환하기</button>
-        <button id="copyBtn" class="ghost">복사</button>
-      </div>
+      <section class="card">
+        <label for="tone">분위기</label>
+        <select id="tone">
+          <option>친근하게</option>
+          <option selected>정중하게</option>
+          <option>아주 정중하게</option>
+          <option>캐주얼하게</option>
+          <option>공손하지만 단호하게</option>
+        </select>
 
-      <label>변환 문자</label>
-      <textarea id="rewrittenText" rows="8" readonly></textarea>
+        <label for="recipient">보내는 대상</label>
+        <select id="recipient">
+          <option>상사</option>
+          <option>동료</option>
+          <option>친구</option>
+          <option>학부모</option>
+          <option>고객</option>
+          <option>거래처</option>
+          <option>연인</option>
+          <option>가족</option>
+          <option selected>기타</option>
+        </select>
+
+        <label for="senderRole">본인 역할</label>
+        <input id="senderRole" type="text" placeholder="예: 담임교사" />
+
+        <label for="originalText">원본 문자</label>
+        <textarea id="originalText" rows="6" placeholder="여기에 원본 문장을 입력하세요"></textarea>
+        <p id="originalTextError" class="field-error"></p>
+
+        <div class="actions">
+          <button id="rewriteBtn" type="button">변환하기</button>
+          <button id="copyBtn" type="button" class="ghost">복사</button>
+        </div>
+
+        <label for="rewrittenText">변환 문자</label>
+        <textarea id="rewrittenText" rows="7" readonly></textarea>
+      </section>
 
       <p id="status" class="status"></p>
 
-      <div class="actions secondary">
-        <button id="proBtn" class="ghost">Pro 구독</button>
-        <button id="businessBtn" class="ghost">Business 구독</button>
-        <button id="topupBtn" class="ghost">+10회 충전</button>
-      </div>
-
-      <small>
-        API 키는 내부 저장되며 직접 입력할 필요가 없습니다. 이메일로 연결 버튼을 눌러 시작하세요.
-      </small>
+      <section class="card plans-card">
+        <div class="actions secondary">
+          <button id="proBtn" type="button" class="ghost">Pro 구독</button>
+          <button id="businessBtn" type="button" class="ghost">Business 구독</button>
+          <button id="topupBtn" type="button" class="ghost">+10회 충전</button>
+        </div>
+      </section>
     </main>
     <script src="popup.js"></script>
   </body>

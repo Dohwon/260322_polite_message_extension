@@ -19,12 +19,15 @@ export const env = {
   billingCurrency: process.env.BILLING_CURRENCY || "krw"
 };
 
+env.tossClientKey = process.env.TOSS_CLIENT_KEY || "";
+env.tossSecretKey = process.env.TOSS_SECRET_KEY || "";
+
 export const PLANS = {
   free: {
     id: "free",
     name: "Free",
     monthlyPriceKrw: 0,
-    maxMonthlyRequests: 40,
+    maxMonthlyRequests: 5,
     maxMonthlyInputTokens: 30000,
     maxMonthlyOutputTokens: 22000,
     maxCharsPerRequest: 1200,
@@ -34,7 +37,7 @@ export const PLANS = {
     id: "pro",
     name: "Pro",
     monthlyPriceKrw: 6900,
-    maxMonthlyRequests: 900,
+    maxMonthlyRequests: 100,
     maxMonthlyInputTokens: 600000,
     maxMonthlyOutputTokens: 360000,
     maxCharsPerRequest: 3200,
@@ -44,9 +47,9 @@ export const PLANS = {
     id: "business",
     name: "Business",
     monthlyPriceKrw: 19900,
-    maxMonthlyRequests: 4000,
-    maxMonthlyInputTokens: 2800000,
-    maxMonthlyOutputTokens: 1600000,
+    maxMonthlyRequests: null,
+    maxMonthlyInputTokens: null,
+    maxMonthlyOutputTokens: null,
     maxCharsPerRequest: 5000,
     model: env.openaiDefaultModel
   }

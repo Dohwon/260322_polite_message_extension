@@ -3,31 +3,49 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import OpenAI from "openai";
 import Stripe from "stripe";
+import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { env, PLANS, TOPUP, TONES, RECIPIENTS } from "./config.js";
 import {
   addBonusRequests,
   addUsage,
+  clearUserSession,
+  consumeFreeCredit,
+  createTossOrder,
   consumeBonusRequest,
   createOrGetUser,
   dbHealth,
   ensureMonthlyUsage,
+  getTossOrdersByUser,
+  getTossOrderByOrderId,
+  getUserByEmail,
   getCurrentMonthlyUsage,
   getUserByApiKey,
+  getUserBySessionToken,
   getUserByStripeCustomer,
   hasBillingEvent,
   insertBillingEvent,
+  markTossOrderPaid,
+  setPasswordHash,
+  setUserSession,
   updatePlan,
   updateStripeCustomer
 } from "./db.js";
 import { buildRewritePrompt, sanitizeRecipient, sanitizeTone } from "./prompt.js";
 
 const app = express();
+app.set("trust proxy", 1);
 
 const openai = env.openaiApiKey
   ? new OpenAI({ apiKey: env.openaiApiKey, timeout: env.openaiTimeoutMs })
   : null;
 
 const stripe = env.stripeSecretKey ? new Stripe(env.stripeSecretKey) : null;
+const tossEnabled = Boolean(env.tossClientKey && env.tossSecretKey);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const plansLandingPath = path.join(__dirname, "plans-landing.html");
 
 function extractResponseText(response) {
   if (typeof response?.output_text === "string" && response.output_text.trim()) {
@@ -57,6 +75,32 @@ function pickPlan(planId) {
   return PLANS[planId] || PLANS.free;
 }
 
+function nowPlusDays(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 19).replace("T", " ");
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  if (!stored || !stored.includes(":")) return false;
+  const [salt, oldHash] = stored.split(":");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return crypto.timingSafeEqual(Buffer.from(oldHash, "hex"), Buffer.from(hash, "hex"));
+}
+
+function createSession(userId, rememberMe) {
+  return {
+    token: `st_${crypto.randomBytes(24).toString("hex")}_${userId}`,
+    expiresAt: nowPlusDays(rememberMe ? 30 : 1)
+  };
+}
+
 function usageSummary(user, monthly) {
   const plan = pickPlan(user.plan_id);
   return {
@@ -73,7 +117,9 @@ function usageSummary(user, monthly) {
       requestCount: monthly.request_count,
       inputTokens: monthly.input_tokens,
       outputTokens: monthly.output_tokens,
-      bonusRequestsRemaining: user.bonus_requests_remaining
+      bonusRequestsRemaining: user.bonus_requests_remaining,
+      freeCreditsRemaining: user.free_credits_remaining ?? 0,
+      freeCreditsTotal: 5
     }
   };
 }
@@ -90,7 +136,7 @@ app.use(
   cors({
     origin: env.allowedOrigins === "*" ? true : env.allowedOrigins.split(",").map((v) => v.trim()),
     methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "x-api-key", "stripe-signature"]
+    allowedHeaders: ["Content-Type", "x-api-key", "x-session-token", "stripe-signature"]
   })
 );
 
@@ -199,10 +245,52 @@ app.get("/api/meta", (_req, res) => {
     })),
     topup: TOPUP,
     billing: {
-      enabled: Boolean(stripe),
-      hasPlanPrices: Boolean(env.stripePriceProMonthly && env.stripePriceBusinessMonthly),
-      hasTopupPrice: Boolean(TOPUP.stripePriceId)
+      enabled: true,
+      provider: tossEnabled ? "toss" : "plans-only",
+      hasPlanPrices: true,
+      hasTopupPrice: true
     }
+  });
+});
+
+app.post("/api/auth/signup", (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  const rememberMe = Boolean(req.body?.rememberMe);
+  if (!email || !email.includes("@") || password.length < 6) {
+    return res.status(400).json({ error: "이메일/비밀번호(6자 이상)를 확인해 주세요." });
+  }
+
+  const user = createOrGetUser(email);
+  if (user.password_hash) {
+    return res.status(409).json({ error: "이미 가입된 이메일입니다. 로그인해 주세요." });
+  }
+  setPasswordHash(user.id, hashPassword(password));
+  const session = createSession(user.id, rememberMe);
+  const updatedUser = setUserSession(user.id, session.token, session.expiresAt);
+  const monthly = ensureMonthlyUsage(updatedUser.id);
+  return res.json({
+    sessionToken: session.token,
+    email: updatedUser.email,
+    ...usageSummary(updatedUser, monthly)
+  });
+});
+
+app.post("/api/auth/login", (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  const rememberMe = Boolean(req.body?.rememberMe);
+  const user = getUserByEmail(email);
+  if (!user || !verifyPassword(password, user.password_hash || "")) {
+    return res.status(401).json({ error: "이메일 또는 비밀번호가 올바르지 않습니다." });
+  }
+  const session = createSession(user.id, rememberMe);
+  const updatedUser = setUserSession(user.id, session.token, session.expiresAt);
+  const monthly = ensureMonthlyUsage(updatedUser.id);
+  return res.json({
+    sessionToken: session.token,
+    email: updatedUser.email,
+    ...usageSummary(updatedUser, monthly)
   });
 });
 
@@ -211,28 +299,49 @@ app.post("/api/auth/register", (req, res) => {
   if (!email || !email.includes("@")) {
     return res.status(400).json({ error: "유효한 이메일을 입력해 주세요." });
   }
-
   const user = createOrGetUser(email);
   const monthly = ensureMonthlyUsage(user.id);
   return res.json({
-    apiKey: user.api_key,
+    apiKey: user.api_key, // legacy fallback
     email: user.email,
     ...usageSummary(user, monthly)
   });
 });
 
 function auth(req, res, next) {
+  const sessionToken = String(req.header("x-session-token") || "").trim();
+  if (sessionToken) {
+    const userBySession = getUserBySessionToken(sessionToken);
+    if (!userBySession) return res.status(401).json({ error: "세션이 만료되었습니다. 다시 로그인해 주세요." });
+    req.user = userBySession;
+    return next();
+  }
+
   const apiKey = String(req.header("x-api-key") || "").trim();
-  if (!apiKey) return res.status(401).json({ error: "API 키가 필요합니다." });
+  if (!apiKey) return res.status(401).json({ error: "로그인이 필요합니다." });
   const user = getUserByApiKey(apiKey);
   if (!user) return res.status(401).json({ error: "유효하지 않은 API 키입니다." });
   req.user = user;
-  next();
+  return next();
 }
 
 app.get("/api/me", auth, (req, res) => {
   const monthly = getCurrentMonthlyUsage(req.user.id);
   res.json({ email: req.user.email, ...usageSummary(req.user, monthly) });
+});
+
+app.get("/api/auth/session", auth, (req, res) => {
+  const monthly = getCurrentMonthlyUsage(req.user.id);
+  return res.json({ ok: true, email: req.user.email, ...usageSummary(req.user, monthly) });
+});
+
+app.post("/api/auth/logout", auth, (req, res) => {
+  clearUserSession(req.user.id);
+  return res.json({ ok: true });
+});
+
+app.get("/api/payments", auth, (req, res) => {
+  return res.json({ items: getTossOrdersByUser(req.user.id) });
 });
 
 app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
@@ -259,16 +368,27 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
     });
   }
 
-  const requestLimitExceeded = monthly.request_count >= plan.maxMonthlyRequests;
-  const tokenLimitExceeded =
-    monthly.input_tokens >= plan.maxMonthlyInputTokens || monthly.output_tokens >= plan.maxMonthlyOutputTokens;
-
-  if (requestLimitExceeded || tokenLimitExceeded) {
-    const usedBonus = consumeBonusRequest(user.id);
-    if (!usedBonus) {
+  if (user.plan_id === "free") {
+    if ((user.free_credits_remaining ?? 0) <= 0) {
       return res.status(402).json({
-        error: "월 사용량 한도를 초과했습니다. 플랜 업그레이드 또는 추가 10회 충전이 필요합니다."
+        error: "무료 5회를 모두 사용했습니다. 요금제를 선택해 주세요."
       });
+    }
+  } else {
+    const hasRequestLimit = Number.isFinite(plan.maxMonthlyRequests);
+    const requestLimitExceeded = hasRequestLimit && monthly.request_count >= plan.maxMonthlyRequests;
+    const hasInputTokenLimit = Number.isFinite(plan.maxMonthlyInputTokens);
+    const hasOutputTokenLimit = Number.isFinite(plan.maxMonthlyOutputTokens);
+    const tokenLimitExceeded =
+      (hasInputTokenLimit && monthly.input_tokens >= plan.maxMonthlyInputTokens) ||
+      (hasOutputTokenLimit && monthly.output_tokens >= plan.maxMonthlyOutputTokens);
+    if (requestLimitExceeded || tokenLimitExceeded) {
+      const usedBonus = consumeBonusRequest(user.id);
+      if (!usedBonus) {
+        return res.status(402).json({
+          error: "월 사용량 한도를 초과했습니다. 플랜 업그레이드 또는 추가 10회 충전이 필요합니다."
+        });
+      }
     }
   }
 
@@ -315,6 +435,10 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
     }
 
     const updated = addUsage(user.id, inputTokens, outputTokens);
+    if (user.plan_id === "free") {
+      consumeFreeCredit(user.id);
+    }
+    const refreshedUser = getUserByApiKey(user.api_key) || req.user;
 
     if (!rewritten) {
       return res.status(502).json({ error: "변환 결과를 생성하지 못했습니다. 다시 시도해 주세요." });
@@ -325,7 +449,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
       usage: {
         inputTokens,
         outputTokens,
-        monthly: usageSummary(getUserByApiKey(user.api_key), updated).usage
+        monthly: usageSummary(refreshedUser, updated).usage
       }
     });
   } catch (err) {
@@ -334,91 +458,142 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
 });
 
 app.post("/api/billing/create-checkout", auth, async (req, res) => {
-  if (!stripe) return res.status(500).json({ error: "Stripe가 설정되지 않았습니다." });
-
-  const user = req.user;
   const planId = String(req.body?.planId || "").trim();
   if (!["pro", "business"].includes(planId)) {
     return res.status(400).json({ error: "지원하지 않는 플랜입니다." });
   }
-
-  const priceId = planId === "pro" ? env.stripePriceProMonthly : env.stripePriceBusinessMonthly;
-  if (!priceId) return res.status(500).json({ error: "Stripe Price ID가 설정되지 않았습니다." });
-
-  try {
-    let customerId = user.stripe_customer_id;
-    if (!customerId) {
-      const customer = await stripe.customers.create({ email: user.email, metadata: { userId: String(user.id) } });
-      customerId = customer.id;
-      updateStripeCustomer(user.id, customerId);
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      customer: customerId,
-      payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${env.appBaseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.appBaseUrl}/billing/cancel`,
-      metadata: {
-        kind: "plan",
-        userId: String(user.id),
-        planId
-      }
-    });
-
-    return res.json({ url: session.url });
-  } catch (err) {
-    return res.status(500).json({ error: err?.message || "결제 세션 생성 실패" });
-  }
+  const url = `${env.appBaseUrl}/billing/plans?target=${encodeURIComponent(planId)}`;
+  return res.json({ url });
 });
 
 app.post("/api/billing/create-topup", auth, async (req, res) => {
-  if (!stripe) return res.status(500).json({ error: "Stripe가 설정되지 않았습니다." });
-  if (!TOPUP.stripePriceId) return res.status(500).json({ error: "Topup Price ID가 설정되지 않았습니다." });
+  const url = `${env.appBaseUrl}/billing/plans?target=topup10`;
+  return res.json({ url });
+});
 
-  const user = req.user;
+app.get("/billing/toss/checkout", (req, res) => {
+  const orderId = String(req.query.orderId || "").trim();
+  const order = getTossOrderByOrderId(orderId);
+  if (!order) {
+    return res.status(404).send("유효하지 않은 주문입니다.");
+  }
+
+  const isPlan = order.kind === "plan";
+  const title = isPlan
+    ? order.plan_id === "pro"
+      ? "Pro 월 이용권"
+      : "Business 월 이용권"
+    : "10회 충전권";
+
+  const customerKey = `user_${order.user_id}`;
+  const successUrl = `${env.appBaseUrl}/billing/toss/success?orderId=${encodeURIComponent(order.order_id)}`;
+  const failUrl = `${env.appBaseUrl}/billing/toss/fail?orderId=${encodeURIComponent(order.order_id)}`;
+
+  const html = `<!doctype html>
+  <html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>결제 진행 - Polite Message Rewriter</title>
+    <style>
+      body { font-family: Pretendard, 'Noto Sans KR', sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #20253a; }
+      .card { border: 1px solid #d9ddf8; border-radius: 12px; padding: 20px; background: #fff; }
+      button { width: 100%; border: 0; border-radius: 10px; padding: 12px; background: #2a62f4; color: #fff; font-size: 15px; cursor: pointer; }
+      h1 { margin-top: 0; }
+      ul { line-height: 1.6; }
+    </style>
+    <script src="https://js.tosspayments.com/v1"></script>
+  </head>
+  <body>
+    <h1>Polite Message Rewriter 요금 안내</h1>
+    <div class="card">
+      <h2>${title}</h2>
+      <p><b>결제금액:</b> ${order.amount.toLocaleString("ko-KR")}원</p>
+      <p><b>Pro vs Business</b></p>
+      <ul>
+        <li>Pro: 개인/소규모 사용, 월 100회</li>
+        <li>Business: 팀 사용, 요청/월 토큰 무제한(1회 5,000자 제한)</li>
+      </ul>
+      <button id="payBtn">토스 결제하기</button>
+    </div>
+    <script>
+      const tossPayments = TossPayments("${env.tossClientKey}");
+      document.getElementById("payBtn").addEventListener("click", function () {
+        tossPayments.requestPayment("카드", {
+          amount: ${order.amount},
+          orderId: "${order.order_id}",
+          orderName: "${title}",
+          customerName: "Polite User",
+          customerEmail: "user${order.user_id}@pm.local",
+          successUrl: "${successUrl}",
+          failUrl: "${failUrl}"
+        });
+      });
+    </script>
+  </body>
+  </html>`;
+
+  return res.type("html").send(html);
+});
+
+app.get("/billing/toss/success", async (req, res) => {
+  const orderId = String(req.query.orderId || req.query.orderId || "").trim();
+  const paymentKey = String(req.query.paymentKey || "").trim();
+  const amount = Number(req.query.amount || 0);
+
+  if (!orderId || !paymentKey || !amount) {
+    return res.status(400).send("결제 확인 파라미터가 누락되었습니다.");
+  }
+
+  const order = getTossOrderByOrderId(orderId);
+  if (!order) return res.status(404).send("주문 정보를 찾을 수 없습니다.");
+  if (order.status === "paid") return res.send("이미 처리된 결제입니다.");
+  if (order.amount !== amount) return res.status(400).send("결제 금액이 일치하지 않습니다.");
 
   try {
-    let customerId = user.stripe_customer_id;
-    if (!customerId) {
-      const customer = await stripe.customers.create({ email: user.email, metadata: { userId: String(user.id) } });
-      customerId = customer.id;
-      updateStripeCustomer(user.id, customerId);
+    const auth = Buffer.from(`${env.tossSecretKey}:`).toString("base64");
+    const confirmRes = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ paymentKey, orderId, amount })
+    });
+    if (!confirmRes.ok) {
+      const txt = await confirmRes.text();
+      return res.status(400).send(`결제 승인 실패: ${txt}`);
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer: customerId,
-      payment_method_types: ["card"],
-      line_items: [{ price: TOPUP.stripePriceId, quantity: 1 }],
-      success_url: `${env.appBaseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.appBaseUrl}/billing/cancel`,
-      metadata: {
-        kind: "topup",
-        userId: String(user.id)
-      }
-    });
+    markTossOrderPaid(orderId, paymentKey);
 
-    return res.json({ url: session.url });
+    if (order.kind === "plan" && ["pro", "business"].includes(order.plan_id || "")) {
+      updatePlan({
+        userId: order.user_id,
+        planId: order.plan_id,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        subscriptionStatus: "active"
+      });
+    }
+    if (order.kind === "topup") {
+      addBonusRequests(order.user_id, TOPUP.requests);
+    }
+
+    return res.send("결제가 완료되었습니다. 익스텐션으로 돌아가 다시 시도해 주세요.");
   } catch (err) {
-    return res.status(500).json({ error: err?.message || "충전 세션 생성 실패" });
+    return res.status(500).send(`결제 승인 처리 중 오류: ${err?.message || "unknown"}`);
   }
 });
 
 app.post("/api/billing/create-portal", auth, async (req, res) => {
-  if (!stripe) return res.status(500).json({ error: "Stripe가 설정되지 않았습니다." });
-  if (!req.user.stripe_customer_id) return res.status(400).json({ error: "결제 고객 정보가 없습니다." });
+  return res.status(400).json({ error: "Toss 결제는 포털이 없습니다. 결제 페이지에서 다시 구매해 주세요." });
+});
 
-  try {
-    const session = await stripe.billingPortal.sessions.create({
-      customer: req.user.stripe_customer_id,
-      return_url: `${env.appBaseUrl}/billing/return`
-    });
-    return res.json({ url: session.url });
-  } catch (err) {
-    return res.status(500).json({ error: err?.message || "포털 세션 생성 실패" });
-  }
+app.get("/billing/toss/fail", (req, res) => {
+  const code = String(req.query.code || "");
+  const message = String(req.query.message || "결제가 취소되었거나 실패했습니다.");
+  res.status(400).send(`결제 실패 [${code}]: ${message}`);
 });
 
 app.get("/billing/success", (_req, res) => {
@@ -431,6 +606,10 @@ app.get("/billing/cancel", (_req, res) => {
 
 app.get("/billing/return", (_req, res) => {
   res.send("결제 포털에서 돌아왔습니다.");
+});
+
+app.get("/billing/plans", (_req, res) => {
+  res.sendFile(plansLandingPath);
 });
 
 app.listen(env.port, () => {

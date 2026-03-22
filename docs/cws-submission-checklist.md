@@ -21,7 +21,7 @@
 ## D. 개인정보/데이터 공개
 - [ ] Privacy Policy URL 입력
 - [ ] Dashboard privacy fields를 실제 동작과 일치하게 선택
-- [ ] 수집 데이터/사용 목적/제3자 제공(OpenAI, Stripe)/보관 기간 기재
+- [ ] 수집 데이터/사용 목적/제3자 제공(OpenAI, TossPayments)/보관 기간 기재
 - [ ] Limited Use 준수 문구 반영
 
 ## E. 심사용 테스트 안내

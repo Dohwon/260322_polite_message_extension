@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#ffffff",
+              "on-surface": "#191c1e",
+              "outline-variant": "#c3c6d5",
+              "tertiary": "#651f00",
+              "primary-fixed-dim": "#aec6ff",
+              "surface-container": "#eceef0",
+              "on-primary-fixed": "#001a42",
+              "on-secondary-container": "#57657a",
+              "tertiary-container": "#8b2e01",
+              "on-primary": "#ffffff",
+              "on-tertiary-container": "#ffaa8a",
+              "primary-fixed": "#d8e2ff",
+              "inverse-on-surface": "#eff1f3",
+              "inverse-primary": "#aec6ff",
+              "secondary": "#515f74",
+              "surface-dim": "#d8dadc",
+              "primary-container": "#294c8a",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#b9c7df",
+              "primary": "#093471",
+              "surface-container-high": "#e6e8ea",
+              "tertiary-fixed-dim": "#ffb59a",
+              "tertiary-fixed": "#ffdbcf",
+              "outline": "#737784",
+              "surface-variant": "#e0e3e5",
+              "error-container": "#ffdad6",
+              "surface-container-highest": "#e0e3e5",
+              "secondary-container": "#d5e3fc",
+              "on-surface-variant": "#434653",
+              "on-primary-fixed-variant": "#224583",
+              "on-tertiary-fixed": "#380d00",
+              "secondary-fixed": "#d5e3fc",
+              "surface-container-low": "#f2f4f6",
+              "surface-container-lowest": "#ffffff",
+              "inverse-surface": "#2d3133",
+              "on-primary-container": "#a1beff",
+              "on-background": "#191c1e",
+              "background": "#f7f9fb",
+              "error": "#ba1a1a",
+              "surface-tint": "#3c5d9c",
+              "surface": "#f7f9fb",
+              "surface-bright": "#f7f9fb",
+              "on-tertiary": "#ffffff",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed-variant": "#3a485b",
+              "on-secondary-fixed": "#0d1c2e",
+              "on-tertiary-fixed-variant": "#802900"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .tonal-transition { transition: background-color 0.3s ease; }
+        .no-line { border: none !important; }
+        .ambient-shadow { box-shadow: 0 32px 64px -12px rgba(25, 28, 30, 0.06); }
+        .hero-gradient { background: linear-gradient(180deg, #f7f9fb 0%, #eceef0 100%); }
+        .primary-gradient { background: linear-gradient(135deg, #093471 0%, #294c8a 100%); }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased">
+<!-- TopAppBar Navigation -->
+<nav class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl">
+<div class="flex justify-between items-center px-8 py-4 max-w-7xl mx-auto">
+<div class="text-xl font-extrabold text-blue-900 dark:text-blue-100 font-headline tracking-tight">
+                Polite Message Rewriter
+            </div>
+<div class="hidden md:flex items-center gap-8 font-manrope font-bold tracking-tight">
+<a class="text-slate-600 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-100 transition-colors" href="#">Features</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-100 transition-colors" href="#">Solutions</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-100 transition-colors" href="#">Testimonials</a>
+<a class="text-blue-700 dark:text-blue-300 font-semibold border-b-2 border-blue-700 dark:border-blue-300 pb-1" href="#">Pricing</a>
+</div>
+<div class="flex items-center gap-4 font-manrope font-bold">
+<button class="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors rounded-lg">Log In</button>
+<button class="px-5 py-2.5 bg-primary text-white rounded-lg hover:opacity-90 transition-all scale-95 active:duration-75">Get Started</button>
+</div>
+</div>
+</nav>
+<main class="pt-24">
+<!-- Hero Section -->
+<section class="hero-gradient pt-20 pb-16 px-6 text-center">
+<div class="max-w-4xl mx-auto">
+<span class="inline-block py-1 px-3 bg-secondary-container text-on-secondary-fixed-variant text-[10px] uppercase tracking-widest font-bold rounded-full mb-6">Subscription Plans</span>
+<h1 class="font-headline text-5xl md:text-6xl font-extrabold text-primary mb-6 tracking-tight">Pro / Business 요금제 비교</h1>
+<p class="text-on-surface-variant text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+                    당신의 전문성을 더하는 정중한 메시지 작성. <br class="hidden md:block"/> 사용량에 딱 맞는 합리적인 플랜을 선택하세요.
+                </p>
+</div>
+</section>
+<!-- Pricing Cards Section -->
+<section class="px-6 py-20 bg-surface">
+<div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+<!-- Pro Plan -->
+<div class="bg-surface-container-lowest p-11 rounded-xl ambient-shadow flex flex-col h-full border border-outline-variant/15">
+<div class="mb-8">
+<h3 class="font-headline text-2xl font-bold text-on-surface mb-2">Pro Plan</h3>
+<p class="text-on-surface-variant text-sm">개인 사용자를 위한 표준 플랜</p>
+</div>
+<div class="mb-10">
+<div class="flex items-baseline gap-1">
+<span class="font-headline text-5xl font-extrabold text-primary">6,900</span>
+<span class="text-xl font-bold text-on-surface-variant">원/월</span>
+</div>
+</div>
+<div class="space-y-4 mb-12 flex-grow">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary bg-primary-fixed/20 p-1 rounded-full text-sm" data-icon="check">check</span>
+<span class="text-on-surface text-sm">월 요청 <strong class="font-semibold">100회</strong></span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary bg-primary-fixed/20 p-1 rounded-full text-sm" data-icon="check">check</span>
+<span class="text-on-surface text-sm">입력 토큰 <strong class="font-semibold">600,000t</strong></span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary bg-primary-fixed/20 p-1 rounded-full text-sm" data-icon="check">check</span>
+<span class="text-on-surface text-sm">출력 토큰 <strong class="font-semibold">360,000t</strong></span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary bg-primary-fixed/20 p-1 rounded-full text-sm" data-icon="check">check</span>
+<span class="text-on-surface text-sm">1회 최대 글자 <strong class="font-semibold">3,200자</strong></span>
+</div>
+</div>
+<button class="w-full py-4 bg-surface-container-high text-on-surface font-bold rounded-lg hover:bg-surface-container-highest transition-colors">플랜 선택하기</button>
+</div>
+<!-- Business Plan (Featured) -->
+<div class="bg-surface-container-lowest p-11 rounded-xl ambient-shadow flex flex-col h-[105%] relative border-2 border-primary/10">
+<div class="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 primary-gradient text-white text-[11px] font-bold rounded-full uppercase tracking-tighter shadow-lg">
+                        Recommended Plan
+                    </div>
+<div class="mb-8">
+<h3 class="font-headline text-2xl font-bold text-on-surface mb-2">Business Plan</h3>
+<p class="text-on-surface-variant text-sm">팀과 기업을 위한 고용량 플랜</p>
+</div>
+<div class="mb-10">
+<div class="flex items-baseline gap-1">
+<span class="font-headline text-5xl font-extrabold text-primary">19,900</span>
+<span class="text-xl font-bold text-on-surface-variant">원/월</span>
+</div>
+</div>
+<div class="space-y-4 mb-12 flex-grow">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
+<span class="text-on-surface text-sm font-semibold">월 요청 무제한</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
+<span class="text-on-surface text-sm font-semibold">입력 토큰 무제한</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
+<span class="text-on-surface text-sm font-semibold">출력 토큰 무제한</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
+<span class="text-on-surface text-sm font-semibold">1회 최대 글자 5,000자</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="bolt" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="text-on-surface text-sm font-semibold">우선 순위 고객 지원</span>
+</div>
+</div>
+<button class="w-full py-4 primary-gradient text-on-primary font-bold rounded-lg shadow-xl shadow-primary/20 hover:scale-[1.02] transition-transform">비즈니스 시작하기</button>
+</div>
+</div>
+<div class="max-w-6xl mx-auto mt-12 text-center">
+<p class="text-on-surface-variant text-sm font-medium bg-surface-container inline-block px-4 py-2 rounded-lg">
+<span class="material-symbols-outlined text-base mr-1" data-icon="info">info</span>
+                    결제는 토스페이먼츠를 통해 안전하게 진행됩니다
+                </p>
+</div>
+</section>
+<!-- Comparison Table Section -->
+<section class="py-24 px-6 bg-surface-container-low">
+<div class="max-w-5xl mx-auto">
+<div class="text-center mb-16">
+<h2 class="font-headline text-3xl font-bold text-on-surface mb-4">상세 기능 비교</h2>
+<p class="text-on-surface-variant">플랜별 상세 사양을 확인해보세요.</p>
+</div>
+<div class="overflow-hidden bg-surface-container-lowest rounded-xl ambient-shadow">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-primary text-white">
+<th class="py-6 px-8 font-headline font-bold">항목</th>
+<th class="py-6 px-8 font-headline font-bold">Pro Plan</th>
+<th class="py-6 px-8 font-headline font-bold">Business Plan</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<tr>
+<td class="py-6 px-8 font-semibold text-on-surface bg-surface-container-lowest">월 요금</td>
+<td class="py-6 px-8 text-primary font-bold">6,900원</td>
+<td class="py-6 px-8 text-primary font-bold">19,900원</td>
+</tr>
+<tr>
+<td class="py-6 px-8 font-semibold text-on-surface">월 요청 수</td>
+<td class="py-6 px-8 text-on-surface-variant">100회</td>
+<td class="py-6 px-8 text-on-surface-variant font-semibold">무제한</td>
+</tr>
+<tr>
+<td class="py-6 px-8 font-semibold text-on-surface">입력 토큰</td>
+<td class="py-6 px-8 text-on-surface-variant">600,000t</td>
+<td class="py-6 px-8 text-on-surface-variant font-semibold">무제한</td>
+</tr>
+<tr>
+<td class="py-6 px-8 font-semibold text-on-surface">출력 토큰</td>
+<td class="py-6 px-8 text-on-surface-variant">360,000t</td>
+<td class="py-6 px-8 text-on-surface-variant font-semibold">무제한</td>
+</tr>
+<tr>
+<td class="py-6 px-8 font-semibold text-on-surface">1회 최대 글자</td>
+<td class="py-6 px-8 text-on-surface-variant">3,200자</td>
+<td class="py-6 px-8 text-on-surface-variant font-semibold">5,000자</td>
+</tr>
+</tbody>
+</table>
+<div class="p-8 bg-surface-container-high/50 flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex items-center gap-4">
+<div class="bg-primary-fixed p-3 rounded-lg">
+<span class="material-symbols-outlined text-primary" data-icon="add_circle" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">추가 충전 서비스</h4>
+<p class="text-sm text-on-surface-variant">모든 플랜에서 용량이 부족할 때 즉시 충전 가능</p>
+</div>
+</div>
+<div class="text-right">
+<span class="text-2xl font-headline font-extrabold text-primary">10회 / 1,000원</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="py-24 px-6 text-center max-w-4xl mx-auto">
+<h2 class="font-headline text-4xl font-extrabold text-on-surface mb-8 tracking-tight">당신의 첫 번째 완벽한 정중함을 위해</h2>
+<div class="flex flex-col sm:flex-row justify-center gap-4">
+<button class="px-10 py-5 primary-gradient text-white font-bold rounded-lg text-lg shadow-xl shadow-primary/20">지금 무료로 체험하기</button>
+<button class="px-10 py-5 bg-surface-container-highest text-on-surface font-bold rounded-lg text-lg">엔터프라이즈 문의</button>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-slate-100 dark:bg-slate-950 w-full py-12 px-8 mt-20 tonal-transition-bg">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="text-lg font-bold text-blue-900 dark:text-blue-100 font-headline">
+                Polite Message Rewriter
+            </div>
+<div class="flex gap-8 font-inter text-sm antialiased text-slate-500 dark:text-slate-500">
+<a class="hover:text-blue-900 transition-all opacity-80 hover:opacity-100" href="#">Privacy Policy</a>
+<a class="hover:text-blue-900 transition-all opacity-80 hover:opacity-100" href="#">Terms of Service</a>
+<a class="hover:text-blue-900 transition-all opacity-80 hover:opacity-100" href="#">Contact Us</a>
+<a class="hover:text-blue-900 transition-all opacity-80 hover:opacity-100" href="#">Cookie Settings</a>
+</div>
+<div class="text-slate-500 dark:text-slate-500 font-inter text-sm antialiased">
+                © 2024 Polite Message Rewriter. All rights reserved.
+            </div>
+</div>
+</footer>
+</body></html>

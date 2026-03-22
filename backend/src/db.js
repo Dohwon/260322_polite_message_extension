@@ -45,7 +45,37 @@ CREATE TABLE IF NOT EXISTS billing_events (
   payload TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS toss_orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id TEXT UNIQUE NOT NULL,
+  user_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  plan_id TEXT,
+  amount INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  payment_key TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
 `);
+
+function safeAddColumn(sql) {
+  try {
+    db.exec(sql);
+  } catch (err) {
+    if (!String(err?.message || "").includes("duplicate column name")) {
+      throw err;
+    }
+  }
+}
+
+safeAddColumn(`ALTER TABLE users ADD COLUMN password_hash TEXT`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN session_token TEXT`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN session_expires_at TEXT`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN free_credits_remaining INTEGER NOT NULL DEFAULT 5`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
 
 const insertUserStmt = db.prepare(`
   INSERT INTO users (email, api_key)
@@ -55,6 +85,11 @@ const insertUserStmt = db.prepare(`
 const getUserByEmailStmt = db.prepare(`SELECT * FROM users WHERE email = ?`);
 const getUserByApiKeyStmt = db.prepare(`SELECT * FROM users WHERE api_key = ?`);
 const getUserByIdStmt = db.prepare(`SELECT * FROM users WHERE id = ?`);
+const getUserBySessionTokenStmt = db.prepare(`
+  SELECT * FROM users
+  WHERE session_token = ?
+    AND (session_expires_at IS NULL OR session_expires_at > CURRENT_TIMESTAMP)
+`);
 
 const upsertMonthlyStmt = db.prepare(`
   INSERT INTO monthly_usage (user_id, month_key)
@@ -117,6 +152,54 @@ const insertBillingEventStmt = db.prepare(`
 `);
 
 const hasBillingEventStmt = db.prepare(`SELECT id FROM billing_events WHERE stripe_event_id = ?`);
+const insertTossOrderStmt = db.prepare(`
+  INSERT INTO toss_orders (order_id, user_id, kind, plan_id, amount)
+  VALUES (?, ?, ?, ?, ?)
+`);
+const getTossOrderByOrderIdStmt = db.prepare(`
+  SELECT * FROM toss_orders WHERE order_id = ?
+`);
+const markTossOrderPaidStmt = db.prepare(`
+  UPDATE toss_orders
+  SET status = 'paid',
+      payment_key = ?,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE order_id = ?
+`);
+const getTossOrdersByUserStmt = db.prepare(`
+  SELECT order_id, kind, plan_id, amount, status, created_at
+  FROM toss_orders
+  WHERE user_id = ?
+  ORDER BY id DESC
+  LIMIT 100
+`);
+const setPasswordHashStmt = db.prepare(`
+  UPDATE users
+  SET password_hash = ?,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ?
+`);
+const setSessionStmt = db.prepare(`
+  UPDATE users
+  SET session_token = ?,
+      session_expires_at = ?,
+      last_login_at = CURRENT_TIMESTAMP,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ?
+`);
+const clearSessionStmt = db.prepare(`
+  UPDATE users
+  SET session_token = NULL,
+      session_expires_at = NULL,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ?
+`);
+const consumeFreeCreditStmt = db.prepare(`
+  UPDATE users
+  SET free_credits_remaining = free_credits_remaining - 1,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = ? AND free_credits_remaining > 0
+`);
 
 function createApiKey() {
   return `pm_${crypto.randomBytes(20).toString("hex")}`;
@@ -147,6 +230,17 @@ export function getUserByApiKey(apiKey) {
 
 export function getUserById(id) {
   return getUserByIdStmt.get(id);
+}
+
+export function getUserByEmail(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return null;
+  return getUserByEmailStmt.get(normalized);
+}
+
+export function getUserBySessionToken(token) {
+  if (!token) return null;
+  return getUserBySessionTokenStmt.get(token);
 }
 
 export function ensureMonthlyUsage(userId, key = monthKey()) {
@@ -199,4 +293,42 @@ export function insertBillingEvent({ stripeEventId, userId, eventType, payload }
 
 export function dbHealth() {
   return { ok: true, path: dbPath };
+}
+
+export function createTossOrder({ orderId, userId, kind, planId, amount }) {
+  insertTossOrderStmt.run(orderId, userId, kind, planId || null, amount);
+  return getTossOrderByOrderIdStmt.get(orderId);
+}
+
+export function getTossOrderByOrderId(orderId) {
+  return getTossOrderByOrderIdStmt.get(orderId);
+}
+
+export function markTossOrderPaid(orderId, paymentKey) {
+  markTossOrderPaidStmt.run(paymentKey, orderId);
+  return getTossOrderByOrderIdStmt.get(orderId);
+}
+
+export function getTossOrdersByUser(userId) {
+  return getTossOrdersByUserStmt.all(userId);
+}
+
+export function setPasswordHash(userId, passwordHash) {
+  setPasswordHashStmt.run(passwordHash, userId);
+  return getUserByIdStmt.get(userId);
+}
+
+export function setUserSession(userId, token, expiresAt) {
+  setSessionStmt.run(token, expiresAt, userId);
+  return getUserByIdStmt.get(userId);
+}
+
+export function clearUserSession(userId) {
+  clearSessionStmt.run(userId);
+  return getUserByIdStmt.get(userId);
+}
+
+export function consumeFreeCredit(userId) {
+  const info = consumeFreeCreditStmt.run(userId);
+  return info.changes > 0;
 }

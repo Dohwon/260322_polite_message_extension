@@ -13,7 +13,7 @@
 - Extension: Vanilla JS, Chrome Storage API
 - Backend: Node.js + Express + SQLite(better-sqlite3)
 - LLM: OpenAI `gpt-5-mini` / `gpt-5-nano`
-- Billing: Stripe Checkout + Billing Portal + Webhook
+- Billing: TossPayments (결제창 + 결제 승인 API)
 
 ## 빠른 시작
 
@@ -27,11 +27,8 @@ npm run dev
 
 필수 환경변수:
 - `OPENAI_API_KEY`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PRICE_PRO_MONTHLY`
-- `STRIPE_PRICE_BUSINESS_MONTHLY`
-- `STRIPE_PRICE_TOPUP_10`
+- `TOSS_CLIENT_KEY`
+- `TOSS_SECRET_KEY`
 
 ### 2) 테스트 사용자 생성 (API 키 발급)
 ```bash
@@ -54,8 +51,8 @@ curl -X POST http://localhost:4310/api/auth/register \
 - `POST /api/rewrite`: 문장 변환
 - `POST /api/billing/create-checkout`: Pro/Business 구독 결제
 - `POST /api/billing/create-topup`: 10회 충전
-- `POST /api/billing/create-portal`: Stripe 포털 이동
-- `POST /api/billing/webhook`: Stripe webhook 수신
+- `GET /billing/toss/checkout`: Toss 결제 랜딩 페이지
+- `GET /billing/toss/success`: 결제 승인 처리
 
 ## 크롬 웹스토어 등록 준비
 
