@@ -1,90 +1,73 @@
-# Polite Message Rewriter (Chrome Extension + API)
+# Polite Message Rewriter
 
-크롬 익스텐션에서 거친 문장을 입력하면, 선택한 톤/대상/발신자 역할에 맞춰 정중한 한국어로 변환해 주는 서비스입니다.
+거친 문장을 상황에 맞는 정중한 한국어 문장으로 다듬는 Chrome Extension + API 서비스입니다.
 
-## 포함 범위
-- Chrome Extension (Manifest V3)
-- Node.js API 서버
-- OpenAI Responses API 연동
-- Stripe 구독/충전 결제 연동
-- 월간 사용량 제한(요청 수 + 토큰 + 글자 수)
+## 현재 제품 정책
+- 로그인/회원가입: `Google OAuth`만 지원
+- Free: 총 `3회` 체험, `1회 2,000자`
+- Pro Monthly: `4,900원/월`, 월 `50회`, `1회 4,000자`
+- Pro Annual: `39,000원/년`, 매달 `100회`, `1회 4,000자`
+- 결제: `TossPayments`
+
+Google 로그인에 성공하면 백엔드 `users` 테이블에 회원 레코드가 생성되므로, 서버에서 해당 사용자가 회원인지, 어떤 플랜인지, 이번 달에 얼마나 썼는지 모두 식별할 수 있습니다.
 
 ## 기술 스택
 - Extension: Vanilla JS, Chrome Storage API
-- Backend: Node.js + Express + SQLite(better-sqlite3)
+- Backend: Node.js + Express + SQLite
 - LLM: OpenAI `gpt-5-mini` / `gpt-5-nano`
-- Billing: TossPayments (결제창 + 결제 승인 API)
+- Billing: TossPayments
 
 ## 빠른 시작
 
 ### 1) 백엔드 실행
 ```bash
 cd backend
-cp .env.example .env
 npm install
 npm run dev
 ```
 
 필수 환경변수:
 - `OPENAI_API_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI`
 - `TOSS_CLIENT_KEY`
 - `TOSS_SECRET_KEY`
 
-### 2) 테스트 사용자 생성 (API 키 발급)
-```bash
-curl -X POST http://localhost:4310/api/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"you@example.com"}'
-```
+권장 값:
+- `APP_BASE_URL=http://localhost:4310`
+- `ALLOWED_ORIGINS=*`
 
-응답의 `apiKey`를 익스텐션에 입력합니다.
-
-### 3) 크롬 익스텐션 로드
-1. Chrome 주소창에 `chrome://extensions` 이동
-2. `개발자 모드` ON
+### 2) Chrome 개발자 모드 테스트
+1. `chrome://extensions` 이동
+2. `개발자 모드` 켜기
 3. `압축해제된 확장 프로그램을 로드` 클릭
-4. `extension` 폴더 선택
+4. 이 프로젝트의 `extension` 폴더 선택
+5. 확장 팝업에서 `Google로 시작` 클릭
+6. 브라우저 탭에서 Google 로그인 완료
+7. 팝업으로 돌아와 문장 다듬기 테스트
 
-## API 요약
-- `POST /api/auth/register`: 이메일로 사용자/API 키 생성
-- `GET /api/me`: 사용량/한도 조회
-- `POST /api/rewrite`: 문장 변환
-- `POST /api/billing/create-checkout`: Pro/Business 구독 결제
-- `POST /api/billing/create-topup`: 10회 충전
-- `GET /billing/toss/checkout`: Toss 결제 랜딩 페이지
-- `GET /billing/toss/success`: 결제 승인 처리
+개발자 모드에서는 `extension/popup.js`가 자동으로 `http://localhost:4310`을 사용합니다. 웹스토어 배포본에서는 `https://polite-message-rewriter-production.up.railway.app`를 사용합니다.
 
-## 크롬 웹스토어 등록 준비
+### 3) 결제 테스트
+- 팝업에서 `Pro Monthly` 또는 `Pro Annual` 클릭
+- `https://polite-message-rewriter-production.up.railway.app/billing/plans` 또는 로컬 `/billing/plans` 페이지로 이동
+- 해당 페이지가 세션을 확인한 뒤 Toss 결제를 시작
 
-### 1) 프로덕션 API 도메인 반영
-- `extension/popup`에서 `API Base URL`을 배포 도메인으로 입력해 사용.
-- 제출용 ZIP은 아래 릴리즈 스크립트로 API 도메인을 고정해서 생성:
-```bash
-python3 scripts_prepare_release.py api.yourdomain.com
-```
-생성물:
-- `dist/manifest.release.json`
-- `dist/polite-message-extension-api.yourdomain.com.zip`
+## 주요 API
+- `GET /api/auth/google/start?deviceId=...`
+- `GET /api/auth/google/callback`
+- `GET /api/auth/google/poll?deviceId=...`
+- `GET /api/auth/session`
+- `POST /api/rewrite`
+- `POST /api/billing/create-checkout`
+- `GET /billing/plans`
+- `GET /billing/toss/checkout`
+- `GET /billing/toss/success`
 
-### 2) 패키징
-```bash
-cd extension
-zip -r ../polite-message-extension.zip .
-```
-
-### 3) 웹스토어 업로드
-- Chrome Web Store Developer Dashboard에서 ZIP 업로드
-- 스토어 설명에 "사용자 입력 문장/결제 정보 처리"를 명시
-- 개인정보처리방침 URL 연결
-
-## 정책/가격 근거
+## 참고 문서
 - [docs/pricing-policy.md](docs/pricing-policy.md)
 - [docs/cws-submission-checklist.md](docs/cws-submission-checklist.md)
 - [docs/cws-store-listing-ko.md](docs/cws-store-listing-ko.md)
 - [docs/reviewer-test-instructions.md](docs/reviewer-test-instructions.md)
 - [docs/privacy-policy-ko.md](docs/privacy-policy-ko.md)
-
-## 운영 권장
-- 결제/사용량 모니터링 대시보드 추가
-- abuse 방지용 IP + API 키 이중 rate-limit 적용
-- 사용자별 프롬프트 템플릿 커스터마이징 기능 추가

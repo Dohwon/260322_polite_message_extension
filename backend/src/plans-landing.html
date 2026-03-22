@@ -1,329 +1,310 @@
-<!DOCTYPE html>
-
-<html class="light" lang="ko"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              "on-error": "#ffffff",
-              "on-surface": "#191c1e",
-              "outline-variant": "#c3c6d5",
-              "tertiary": "#651f00",
-              "primary-fixed-dim": "#aec6ff",
-              "surface-container": "#eceef0",
-              "on-primary-fixed": "#001a42",
-              "on-secondary-container": "#57657a",
-              "tertiary-container": "#8b2e01",
-              "on-primary": "#ffffff",
-              "on-tertiary-container": "#ffaa8a",
-              "primary-fixed": "#d8e2ff",
-              "inverse-on-surface": "#eff1f3",
-              "inverse-primary": "#aec6ff",
-              "secondary": "#515f74",
-              "surface-dim": "#d8dadc",
-              "primary-container": "#294c8a",
-              "on-secondary": "#ffffff",
-              "secondary-fixed-dim": "#b9c7df",
-              "primary": "#093471",
-              "surface-container-high": "#e6e8ea",
-              "tertiary-fixed-dim": "#ffb59a",
-              "tertiary-fixed": "#ffdbcf",
-              "outline": "#737784",
-              "surface-variant": "#e0e3e5",
-              "error-container": "#ffdad6",
-              "surface-container-highest": "#e0e3e5",
-              "secondary-container": "#d5e3fc",
-              "on-surface-variant": "#434653",
-              "on-primary-fixed-variant": "#224583",
-              "on-tertiary-fixed": "#380d00",
-              "secondary-fixed": "#d5e3fc",
-              "surface-container-low": "#f2f4f6",
-              "surface-container-lowest": "#ffffff",
-              "inverse-surface": "#2d3133",
-              "on-primary-container": "#a1beff",
-              "on-background": "#191c1e",
-              "background": "#f7f9fb",
-              "error": "#ba1a1a",
-              "surface-tint": "#3c5d9c",
-              "surface": "#f7f9fb",
-              "surface-bright": "#f7f9fb",
-              "on-tertiary": "#ffffff",
-              "on-error-container": "#93000a",
-              "on-secondary-fixed-variant": "#3a485b",
-              "on-secondary-fixed": "#0d1c2e",
-              "on-tertiary-fixed-variant": "#802900"
-            },
-            fontFamily: {
-              "headline": ["Manrope"],
-              "body": ["Inter"],
-              "label": ["Inter"]
-            },
-            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
-          },
-        },
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Polite Message Rewriter 요금제</title>
+    <style>
+      :root {
+        --bg: #f5f7fb;
+        --panel: rgba(255, 255, 255, 0.92);
+        --line: #d7deef;
+        --text: #172033;
+        --muted: #5d6883;
+        --primary: #1342a7;
+        --primary-2: #0f327e;
+        --soft: #e8efff;
+        --ok: #1f6b35;
+        --warn: #8a5d00;
       }
-    </script>
-<style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-            vertical-align: middle;
-        }
-        .tonal-transition { transition: background-color 0.3s ease; }
-        .no-line { border: none !important; }
-        .ambient-shadow { box-shadow: 0 32px 64px -12px rgba(25, 28, 30, 0.06); }
-        .hero-gradient { background: linear-gradient(180deg, #f7f9fb 0%, #eceef0 100%); }
-        .primary-gradient { background: linear-gradient(135deg, #093471 0%, #294c8a 100%); }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Pretendard, "Noto Sans KR", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, #d9e7ff 0%, transparent 32%),
+          radial-gradient(circle at bottom right, #edf3ff 0%, transparent 38%),
+          var(--bg);
+      }
+      .shell { max-width: 1120px; margin: 0 auto; padding: 32px 20px 80px; }
+      .hero { padding: 40px 0 24px; }
+      .eyebrow {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--soft);
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      h1 {
+        margin: 18px 0 12px;
+        font-size: clamp(34px, 6vw, 58px);
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+      }
+      .lead {
+        margin: 0;
+        max-width: 760px;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.65;
+      }
+      .notice {
+        margin-top: 22px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .chip {
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        font-size: 13px;
+      }
+      .status {
+        margin-top: 20px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        font-size: 14px;
+      }
+      .status strong { color: var(--primary); }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 28px;
+      }
+      .card {
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        padding: 24px;
+        background: var(--panel);
+        box-shadow: 0 24px 56px -38px rgba(25, 42, 76, 0.34);
+      }
+      .card.featured {
+        border: 2px solid rgba(19, 66, 167, 0.18);
+        transform: translateY(-8px);
+      }
+      .badge {
+        position: absolute;
+        top: 18px;
+        right: 18px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #162e63;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .plan-name { font-size: 22px; font-weight: 800; }
+      .plan-desc { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+      .price {
+        display: flex;
+        align-items: end;
+        gap: 8px;
+        margin: 28px 0 10px;
+      }
+      .price strong { font-size: 44px; line-height: 1; letter-spacing: -0.04em; }
+      .price span { color: var(--muted); font-size: 15px; }
+      .subline { color: var(--muted); font-size: 13px; min-height: 20px; }
+      ul { margin: 22px 0 0; padding: 0; list-style: none; }
+      li {
+        margin-top: 10px;
+        padding-left: 18px;
+        position: relative;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 9px;
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--primary);
+      }
+      .cta {
+        margin-top: 26px;
+        width: 100%;
+        border: 0;
+        border-radius: 14px;
+        padding: 14px 16px;
+        font-size: 15px;
+        font-weight: 800;
+        cursor: pointer;
+        color: #fff;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+      }
+      .cta.secondary {
+        background: #edf2ff;
+        color: var(--primary);
+      }
+      .cta:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .faq {
+        margin-top: 36px;
+        padding: 22px;
+        border-radius: 24px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+      .faq h2 { margin: 0 0 14px; font-size: 22px; }
+      .faq p { margin: 10px 0 0; color: var(--muted); line-height: 1.65; }
+      .hint { color: var(--warn); font-weight: 700; }
+      @media (max-width: 960px) {
+        .grid { grid-template-columns: 1fr; }
+        .card.featured { transform: none; }
+      }
     </style>
-</head>
-<body class="bg-surface font-body text-on-surface antialiased">
-<!-- TopAppBar Navigation -->
-<nav class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl">
-<div class="flex justify-between items-center px-8 py-4 max-w-7xl mx-auto">
-<div class="text-xl font-extrabold text-blue-900 dark:text-blue-100 font-headline tracking-tight">
-                Polite Message Rewriter
-            </div>
-<div class="hidden md:flex items-center gap-8 font-manrope font-bold tracking-tight">
-<a class="text-slate-600 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-100 transition-colors" href="#features">Features</a>
-<a class="text-slate-600 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-100 transition-colors" href="#solutions">Solutions</a>
-<a class="text-slate-600 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-100 transition-colors" href="#testimonials">Testimonials</a>
-<a class="text-blue-700 dark:text-blue-300 font-semibold border-b-2 border-blue-700 dark:border-blue-300 pb-1" href="#pricing">Pricing</a>
-</div>
-<div class="flex items-center gap-4 font-manrope font-bold">
-<a class="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors rounded-lg" href="#pricing">Log In</a>
-<a class="px-5 py-2.5 bg-primary text-white rounded-lg hover:opacity-90 transition-all scale-95 active:duration-75" href="#pricing">Get Started</a>
-</div>
-</div>
-</nav>
-<main class="pt-24">
-<!-- Hero Section -->
-<section class="hero-gradient pt-20 pb-16 px-6 text-center">
-<div class="max-w-4xl mx-auto">
-<span class="inline-block py-1 px-3 bg-secondary-container text-on-secondary-fixed-variant text-[10px] uppercase tracking-widest font-bold rounded-full mb-6">Subscription Plans</span>
-<h1 class="font-headline text-5xl md:text-6xl font-extrabold text-primary mb-6 tracking-tight">Pro / Business 요금제 비교</h1>
-<p class="text-on-surface-variant text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-                    당신의 전문성을 더하는 정중한 메시지 작성. <br class="hidden md:block"/> 사용량에 딱 맞는 합리적인 플랜을 선택하세요.
-                </p>
-</div>
-</section>
-<section class="px-6 py-16 bg-surface-container-low" id="features">
-<div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/20">
-<h3 class="font-headline text-xl font-bold mb-2">톤 전환 정확도</h3>
-<p class="text-sm text-on-surface-variant">친근/정중/아주 정중/캐주얼 톤을 목적에 맞춰 안정적으로 변환합니다.</p>
-</div>
-<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/20">
-<h3 class="font-headline text-xl font-bold mb-2">상황 맞춤 문맥</h3>
-<p class="text-sm text-on-surface-variant">상대와 발신자 역할을 반영해 실제 보내기 좋은 문장을 생성합니다.</p>
-</div>
-<div class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/20">
-<h3 class="font-headline text-xl font-bold mb-2">크롬 확장 즉시 사용</h3>
-<p class="text-sm text-on-surface-variant">브라우저에서 바로 입력, 변환, 복사까지 완료할 수 있습니다.</p>
-</div>
-</div>
-</section>
-<section class="px-6 py-16 bg-surface" id="solutions">
-<div class="max-w-6xl mx-auto">
-<h2 class="font-headline text-3xl font-bold mb-6">누가 쓰면 좋을까요?</h2>
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-<div class="bg-surface-container-low rounded-xl p-6">
-<h4 class="font-bold mb-2">개인 사용자</h4>
-<p class="text-sm text-on-surface-variant">메신저/이메일에서 말투를 다듬고 싶은 사용자에게 적합합니다.</p>
-</div>
-<div class="bg-surface-container-low rounded-xl p-6">
-<h4 class="font-bold mb-2">강사/교육 업종</h4>
-<p class="text-sm text-on-surface-variant">학부모/수강생 커뮤니케이션을 부드럽고 명확하게 정리합니다.</p>
-</div>
-<div class="bg-surface-container-low rounded-xl p-6">
-<h4 class="font-bold mb-2">팀/사업자</h4>
-<p class="text-sm text-on-surface-variant">고객 응대 문구를 일관된 톤으로 빠르게 생성할 수 있습니다.</p>
-</div>
-</div>
-</div>
-</section>
-<section class="px-6 py-16 bg-surface-container-low" id="testimonials">
-<div class="max-w-6xl mx-auto">
-<h2 class="font-headline text-3xl font-bold mb-6">사용자 후기</h2>
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-<blockquote class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/20 text-sm text-on-surface-variant">“감정적인 문장을 보내기 전에 한 번 정리해서 보내니 관계가 훨씬 부드러워졌어요.”</blockquote>
-<blockquote class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/20 text-sm text-on-surface-variant">“학부모 안내 문구를 작성할 때 톤 맞추는 시간이 크게 줄었습니다.”</blockquote>
-</div>
-</div>
-</section>
-<!-- Pricing Cards Section -->
-<section class="px-6 py-20 bg-surface" id="pricing">
-<div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
-<!-- Pro Plan -->
-<div class="bg-surface-container-lowest p-11 rounded-xl ambient-shadow flex flex-col h-full border border-outline-variant/15">
-<div class="mb-8">
-<h3 class="font-headline text-2xl font-bold text-on-surface mb-2">Pro Plan</h3>
-<p class="text-on-surface-variant text-sm">개인 사용자를 위한 표준 플랜</p>
-</div>
-<div class="mb-10">
-<div class="flex items-baseline gap-1">
-<span class="font-headline text-5xl font-extrabold text-primary">6,900</span>
-<span class="text-xl font-bold text-on-surface-variant">원/월</span>
-</div>
-</div>
-<div class="space-y-4 mb-12 flex-grow">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-primary bg-primary-fixed/20 p-1 rounded-full text-sm" data-icon="check">check</span>
-<span class="text-on-surface text-sm">월 요청 <strong class="font-semibold">100회</strong></span>
-</div>
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-primary bg-primary-fixed/20 p-1 rounded-full text-sm" data-icon="check">check</span>
-<span class="text-on-surface text-sm">입력 토큰 <strong class="font-semibold">600,000t</strong></span>
-</div>
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-primary bg-primary-fixed/20 p-1 rounded-full text-sm" data-icon="check">check</span>
-<span class="text-on-surface text-sm">출력 토큰 <strong class="font-semibold">360,000t</strong></span>
-</div>
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-primary bg-primary-fixed/20 p-1 rounded-full text-sm" data-icon="check">check</span>
-<span class="text-on-surface text-sm">1회 최대 글자 <strong class="font-semibold">3,200자</strong></span>
-</div>
-</div>
-<button class="w-full py-4 bg-surface-container-high text-on-surface font-bold rounded-lg hover:bg-surface-container-highest transition-colors">플랜 선택하기</button>
-</div>
-<!-- Business Plan (Featured) -->
-<div class="bg-surface-container-lowest p-11 rounded-xl ambient-shadow flex flex-col h-[105%] relative border-2 border-primary/10">
-<div class="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 primary-gradient text-white text-[11px] font-bold rounded-full uppercase tracking-tighter shadow-lg">
-                        Recommended Plan
-                    </div>
-<div class="mb-8">
-<h3 class="font-headline text-2xl font-bold text-on-surface mb-2">Business Plan</h3>
-<p class="text-on-surface-variant text-sm">팀과 기업을 위한 고용량 플랜</p>
-</div>
-<div class="mb-10">
-<div class="flex items-baseline gap-1">
-<span class="font-headline text-5xl font-extrabold text-primary">19,900</span>
-<span class="text-xl font-bold text-on-surface-variant">원/월</span>
-</div>
-</div>
-<div class="space-y-4 mb-12 flex-grow">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
-<span class="text-on-surface text-sm font-semibold">월 요청 무제한</span>
-</div>
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
-<span class="text-on-surface text-sm font-semibold">입력 토큰 무제한</span>
-</div>
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
-<span class="text-on-surface text-sm font-semibold">출력 토큰 무제한</span>
-</div>
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
-<span class="text-on-surface text-sm font-semibold">1회 최대 글자 5,000자</span>
-</div>
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-white bg-primary p-1 rounded-full text-sm" data-icon="bolt" style="font-variation-settings: 'FILL' 1;">bolt</span>
-<span class="text-on-surface text-sm font-semibold">우선 순위 고객 지원</span>
-</div>
-</div>
-<button class="w-full py-4 primary-gradient text-on-primary font-bold rounded-lg shadow-xl shadow-primary/20 hover:scale-[1.02] transition-transform">비즈니스 시작하기</button>
-</div>
-</div>
-<div class="max-w-6xl mx-auto mt-12 text-center">
-<p class="text-on-surface-variant text-sm font-medium bg-surface-container inline-block px-4 py-2 rounded-lg">
-<span class="material-symbols-outlined text-base mr-1" data-icon="info">info</span>
-                    결제는 토스페이먼츠를 통해 안전하게 진행됩니다
-                </p>
-</div>
-</section>
-<!-- Comparison Table Section -->
-<section class="py-24 px-6 bg-surface-container-low">
-<div class="max-w-5xl mx-auto">
-<div class="text-center mb-16">
-<h2 class="font-headline text-3xl font-bold text-on-surface mb-4">상세 기능 비교</h2>
-<p class="text-on-surface-variant">플랜별 상세 사양을 확인해보세요.</p>
-</div>
-<div class="overflow-hidden bg-surface-container-lowest rounded-xl ambient-shadow">
-<table class="w-full text-left border-collapse">
-<thead>
-<tr class="bg-primary text-white">
-<th class="py-6 px-8 font-headline font-bold">항목</th>
-<th class="py-6 px-8 font-headline font-bold">Pro Plan</th>
-<th class="py-6 px-8 font-headline font-bold">Business Plan</th>
-</tr>
-</thead>
-<tbody class="divide-y divide-outline-variant/10">
-<tr>
-<td class="py-6 px-8 font-semibold text-on-surface bg-surface-container-lowest">월 요금</td>
-<td class="py-6 px-8 text-primary font-bold">6,900원</td>
-<td class="py-6 px-8 text-primary font-bold">19,900원</td>
-</tr>
-<tr>
-<td class="py-6 px-8 font-semibold text-on-surface">월 요청 수</td>
-<td class="py-6 px-8 text-on-surface-variant">100회</td>
-<td class="py-6 px-8 text-on-surface-variant font-semibold">무제한</td>
-</tr>
-<tr>
-<td class="py-6 px-8 font-semibold text-on-surface">입력 토큰</td>
-<td class="py-6 px-8 text-on-surface-variant">600,000t</td>
-<td class="py-6 px-8 text-on-surface-variant font-semibold">무제한</td>
-</tr>
-<tr>
-<td class="py-6 px-8 font-semibold text-on-surface">출력 토큰</td>
-<td class="py-6 px-8 text-on-surface-variant">360,000t</td>
-<td class="py-6 px-8 text-on-surface-variant font-semibold">무제한</td>
-</tr>
-<tr>
-<td class="py-6 px-8 font-semibold text-on-surface">1회 최대 글자</td>
-<td class="py-6 px-8 text-on-surface-variant">3,200자</td>
-<td class="py-6 px-8 text-on-surface-variant font-semibold">5,000자</td>
-</tr>
-</tbody>
-</table>
-<div class="p-8 bg-surface-container-high/50 flex flex-col md:flex-row justify-between items-center gap-4">
-<div class="flex items-center gap-4">
-<div class="bg-primary-fixed p-3 rounded-lg">
-<span class="material-symbols-outlined text-primary" data-icon="add_circle" style="font-variation-settings: 'FILL' 1;">add_circle</span>
-</div>
-<div>
-<h4 class="font-bold text-on-surface">추가 충전 서비스</h4>
-<p class="text-sm text-on-surface-variant">모든 플랜에서 용량이 부족할 때 즉시 충전 가능</p>
-</div>
-</div>
-<div class="text-right">
-<span class="text-2xl font-headline font-extrabold text-primary">10회 / 1,000원</span>
-</div>
-</div>
-</div>
-</div>
-</section>
-<!-- CTA Section -->
-<section class="py-24 px-6 text-center max-w-4xl mx-auto">
-<h2 class="font-headline text-4xl font-extrabold text-on-surface mb-8 tracking-tight">당신의 첫 번째 완벽한 정중함을 위해</h2>
-<div class="flex flex-col sm:flex-row justify-center gap-4">
-<button class="px-10 py-5 primary-gradient text-white font-bold rounded-lg text-lg shadow-xl shadow-primary/20">지금 무료로 체험하기</button>
-<button class="px-10 py-5 bg-surface-container-highest text-on-surface font-bold rounded-lg text-lg">엔터프라이즈 문의</button>
-</div>
-</section>
-</main>
-<!-- Footer -->
-<footer class="bg-slate-100 dark:bg-slate-950 w-full py-12 px-8 mt-20 tonal-transition-bg">
-<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-<div class="text-lg font-bold text-blue-900 dark:text-blue-100 font-headline">
-                Polite Message Rewriter
-            </div>
-<div class="flex gap-8 font-inter text-sm antialiased text-slate-500 dark:text-slate-500">
-<a class="hover:text-blue-900 transition-all opacity-80 hover:opacity-100" href="/legal/privacy">Privacy Policy</a>
-<a class="hover:text-blue-900 transition-all opacity-80 hover:opacity-100" href="/legal/terms">Terms of Service</a>
-<a class="hover:text-blue-900 transition-all opacity-80 hover:opacity-100" href="/legal/contact">Contact Us</a>
-<a class="hover:text-blue-900 transition-all opacity-80 hover:opacity-100" href="/legal/cookies">Cookie Settings</a>
-</div>
-<div class="text-slate-500 dark:text-slate-500 font-inter text-sm antialiased">
-                © 2024 Polite Message Rewriter. All rights reserved.
-            </div>
-</div>
-</footer>
-</body></html>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <span class="eyebrow">Google 로그인 전용 요금제</span>
+        <h1>무료 체험 후, 필요한 만큼만 결제하는<br />Polite Message Rewriter</h1>
+        <p class="lead">
+          이메일/비밀번호 가입은 받지 않습니다. Google 계정으로 로그인한 사용자만 백엔드 회원으로 등록되고,
+          정중한 메시지 재작성 요청은 서버에서 사용량을 체크한 뒤 처리합니다.
+        </p>
+        <div class="notice">
+          <div class="chip">Free 3회 체험</div>
+          <div class="chip">Pro Monthly: 월 50회 / 1회 4,000자</div>
+          <div class="chip">Pro Annual: 매달 100회 / 1회 4,000자</div>
+        </div>
+        <div id="memberStatus" class="status">
+          <strong>로그인 상태 확인 중...</strong>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <div class="plan-name">Free</div>
+          <p class="plan-desc">처음 써보는 사용자를 위한 체험 플랜입니다.</p>
+          <div class="price"><strong>0원</strong><span>/ 체험</span></div>
+          <div class="subline">Google 로그인 후 바로 3회 제공</div>
+          <ul>
+            <li>총 3회 사용</li>
+            <li>1회 최대 2,000자</li>
+            <li>정중한 메시지 재작성 기본 기능</li>
+            <li>백엔드에 회원 여부와 사용량 기록</li>
+          </ul>
+          <button type="button" class="cta secondary" disabled>현재 체험 플랜</button>
+        </article>
+
+        <article class="card featured">
+          <div class="badge">추천</div>
+          <div class="plan-name">Pro Monthly</div>
+          <p class="plan-desc">개인 사용자가 가볍게 꾸준히 쓰기에 맞춘 월간 플랜입니다.</p>
+          <div class="price"><strong>4,900원</strong><span>/ 월</span></div>
+          <div class="subline">월 50회, 1회 4,000자</div>
+          <ul>
+            <li>매달 50회까지 사용</li>
+            <li>1회 최대 4,000자</li>
+            <li>Free보다 긴 문장 처리 가능</li>
+            <li>Google 로그인 계정 기준으로 사용량 관리</li>
+          </ul>
+          <button id="buyMonthlyBtn" type="button" class="cta">Pro Monthly 결제</button>
+        </article>
+
+        <article class="card">
+          <div class="plan-name">Pro Annual</div>
+          <p class="plan-desc">반복 사용이 확실한 사용자에게 맞춘 연간 플랜입니다.</p>
+          <div class="price"><strong>39,000원</strong><span>/ 년</span></div>
+          <div class="subline">매달 100회, 1회 4,000자</div>
+          <ul>
+            <li>매달 100회까지 사용</li>
+            <li>1회 최대 4,000자</li>
+            <li>월간 플랜보다 더 넉넉한 사용량</li>
+            <li>추가 아이디 생성 없이 동일 Google 계정 유지</li>
+          </ul>
+          <button id="buyAnnualBtn" type="button" class="cta secondary">Pro Annual 결제</button>
+        </article>
+      </section>
+
+      <section class="faq">
+        <h2>정책 요약</h2>
+        <p>회원가입은 Google OAuth로만 받습니다. 백엔드에는 `users` 레코드가 생성되므로, 로그인된 사용자가 실제 회원인지 여부와 현재 플랜 상태를 서버에서 판단할 수 있습니다.</p>
+        <p>Chrome Web Store 확장에는 비밀키를 넣지 않습니다. 실제 AI 재작성은 확장 프로그램이 아니라 백엔드 서버가 처리합니다.</p>
+        <p class="hint">이 페이지는 확장 프로그램에서 열릴 때 `sessionToken`을 함께 받아야 즉시 결제를 진행할 수 있습니다. 직접 접속한 경우에는 먼저 확장에서 Google 로그인을 완료하세요.</p>
+      </section>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const target = params.get("target") || "";
+      const sessionToken = params.get("sessionToken") || "";
+      const apiBaseUrl = window.location.origin;
+      const memberStatus = document.getElementById("memberStatus");
+      const buyMonthlyBtn = document.getElementById("buyMonthlyBtn");
+      const buyAnnualBtn = document.getElementById("buyAnnualBtn");
+
+      function setMemberStatus(html) {
+        memberStatus.innerHTML = html;
+      }
+
+      async function fetchSession() {
+        if (!sessionToken) {
+          setMemberStatus("<strong>확장에서 연 페이지가 아닙니다.</strong><br />결제를 진행하려면 먼저 확장에서 Google 로그인을 완료하세요.");
+          buyMonthlyBtn.disabled = true;
+          buyAnnualBtn.disabled = true;
+          return;
+        }
+
+        try {
+          const res = await fetch(`${apiBaseUrl}/api/auth/session`, {
+            headers: { "x-session-token": sessionToken }
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || "세션 확인 실패");
+
+          setMemberStatus(
+            `<strong>${json.email}</strong><br />${json.planName} · ${json.member?.isRegistered ? "회원 등록 완료" : "미등록"} · ${json.usage.requestCount || 0}회 사용`
+          );
+          buyMonthlyBtn.disabled = false;
+          buyAnnualBtn.disabled = false;
+        } catch (err) {
+          setMemberStatus(`<strong>로그인 상태를 확인할 수 없습니다.</strong><br />${String(err.message || err)}`);
+          buyMonthlyBtn.disabled = true;
+          buyAnnualBtn.disabled = true;
+        }
+      }
+
+      async function startCheckout(planId) {
+        try {
+          const res = await fetch(`${apiBaseUrl}/api/billing/create-checkout`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-session-token": sessionToken
+            },
+            body: JSON.stringify({ planId })
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || "결제 링크 생성 실패");
+          window.location.href = json.checkoutUrl;
+        } catch (err) {
+          alert(String(err.message || err));
+        }
+      }
+
+      buyMonthlyBtn.addEventListener("click", () => startCheckout("pro_monthly"));
+      buyAnnualBtn.addEventListener("click", () => startCheckout("pro_annual"));
+
+      fetchSession().then(() => {
+        if (target === "pro_monthly") buyMonthlyBtn.focus();
+        if (target === "pro_annual") buyAnnualBtn.focus();
+      });
+    </script>
+  </body>
+</html>

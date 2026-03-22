@@ -74,7 +74,7 @@ function safeAddColumn(sql) {
 safeAddColumn(`ALTER TABLE users ADD COLUMN password_hash TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN session_token TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN session_expires_at TEXT`);
-safeAddColumn(`ALTER TABLE users ADD COLUMN free_credits_remaining INTEGER NOT NULL DEFAULT 5`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN free_credits_remaining INTEGER NOT NULL DEFAULT 3`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN auth_provider TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN google_sub TEXT`);
@@ -216,6 +216,12 @@ const linkGoogleAccountStmt = db.prepare(`
       updated_at = CURRENT_TIMESTAMP
   WHERE id = ?
 `);
+const normalizeLegacyFreeCreditsStmt = db.prepare(`
+  UPDATE users
+  SET free_credits_remaining = 3,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE plan_id = 'free' AND free_credits_remaining > 3
+`);
 
 function createApiKey() {
   return `pm_${crypto.randomBytes(20).toString("hex")}`;
@@ -226,6 +232,8 @@ function monthKey(date = new Date()) {
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
 }
+
+normalizeLegacyFreeCreditsStmt.run();
 
 export function createOrGetUser(email) {
   const normalized = String(email || "").trim().toLowerCase();

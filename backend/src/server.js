@@ -2,18 +2,15 @@ import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import OpenAI from "openai";
-import Stripe from "stripe";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { env, PLANS, TOPUP, TONES, RECIPIENTS } from "./config.js";
+import { env, PLANS, TONES, RECIPIENTS } from "./config.js";
 import {
-  addBonusRequests,
   addUsage,
   clearUserSession,
   consumeFreeCredit,
   createTossOrder,
-  consumeBonusRequest,
   createOrGetUser,
   dbHealth,
   ensureMonthlyUsage,
@@ -22,14 +19,10 @@ import {
   getCurrentMonthlyUsage,
   getUserByGoogleSub,
   getUserBySessionToken,
-  getUserByStripeCustomer,
-  hasBillingEvent,
-  insertBillingEvent,
   linkGoogleAccount,
   markTossOrderPaid,
   setUserSession,
-  updatePlan,
-  updateStripeCustomer
+  updatePlan
 } from "./db.js";
 import { buildRewritePrompt, sanitizeRecipient, sanitizeTone } from "./prompt.js";
 
@@ -40,7 +33,6 @@ const openai = env.openaiApiKey
   ? new OpenAI({ apiKey: env.openaiApiKey, timeout: env.openaiTimeoutMs })
   : null;
 
-const stripe = env.stripeSecretKey ? new Stripe(env.stripeSecretKey) : null;
 const tossEnabled = Boolean(env.tossClientKey && env.tossSecretKey);
 const googleAuthEnabled = Boolean(env.googleClientId && env.googleClientSecret);
 const __filename = fileURLToPath(import.meta.url);
@@ -128,6 +120,8 @@ function usageSummary(user, monthly) {
     planId: user.plan_id,
     planName: plan.name,
     monthlyPriceKrw: plan.monthlyPriceKrw,
+    yearlyPriceKrw: plan.yearlyPriceKrw ?? null,
+    billingCycle: plan.billingCycle || "monthly",
     limits: {
       maxMonthlyRequests: plan.maxMonthlyRequests,
       maxMonthlyInputTokens: plan.maxMonthlyInputTokens,
@@ -138,9 +132,13 @@ function usageSummary(user, monthly) {
       requestCount: monthly.request_count,
       inputTokens: monthly.input_tokens,
       outputTokens: monthly.output_tokens,
-      bonusRequestsRemaining: user.bonus_requests_remaining,
       freeCreditsRemaining: user.free_credits_remaining ?? 0,
-      freeCreditsTotal: 5
+      freeCreditsTotal: PLANS.free.maxMonthlyRequests
+    },
+    member: {
+      isRegistered: Boolean(user.id),
+      authProvider: user.auth_provider || null,
+      hasGoogleAuth: Boolean(user.google_sub)
     }
   };
 }
@@ -167,91 +165,9 @@ app.use(
   cors({
     origin: env.allowedOrigins === "*" ? true : env.allowedOrigins.split(",").map((v) => v.trim()),
     methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "x-api-key", "x-session-token", "stripe-signature"]
+    allowedHeaders: ["Content-Type", "x-session-token"]
   })
 );
-
-app.post("/api/billing/webhook", express.raw({ type: "application/json" }), (req, res) => {
-  if (!stripe || !env.stripeWebhookSecret) {
-    return res.status(500).send("Stripe webhook not configured");
-  }
-
-  const signature = req.headers["stripe-signature"];
-  let event;
-
-  try {
-    event = stripe.webhooks.constructEvent(req.body, signature, env.stripeWebhookSecret);
-  } catch (err) {
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  if (hasBillingEvent(event.id)) {
-    return res.json({ received: true, duplicated: true });
-  }
-
-  try {
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      const userId = Number(session.metadata?.userId || 0);
-      const kind = session.metadata?.kind;
-      if (userId > 0) {
-        if (kind === "plan") {
-          const planId = session.metadata?.planId;
-          updatePlan({
-            userId,
-            planId,
-            stripeCustomerId: String(session.customer || ""),
-            stripeSubscriptionId: String(session.subscription || ""),
-            subscriptionStatus: "active"
-          });
-        } else if (kind === "topup") {
-          addBonusRequests(userId, TOPUP.requests);
-        }
-      }
-    }
-
-    if (event.type === "customer.subscription.deleted") {
-      const subscription = event.data.object;
-      const customerId = String(subscription.customer || "");
-      const user = getUserByStripeCustomer(customerId);
-      if (user) {
-        updatePlan({
-          userId: user.id,
-          planId: "free",
-          stripeCustomerId: customerId,
-          stripeSubscriptionId: null,
-          subscriptionStatus: "canceled"
-        });
-      }
-    }
-
-    if (event.type === "invoice.payment_failed") {
-      const invoice = event.data.object;
-      const customerId = String(invoice.customer || "");
-      const user = getUserByStripeCustomer(customerId);
-      if (user) {
-        updatePlan({
-          userId: user.id,
-          planId: "free",
-          stripeCustomerId: customerId,
-          stripeSubscriptionId: user.stripe_subscription_id,
-          subscriptionStatus: "past_due"
-        });
-      }
-    }
-
-    insertBillingEvent({
-      stripeEventId: event.id,
-      userId: null,
-      eventType: event.type,
-      payload: { id: event.id, type: event.type }
-    });
-
-    return res.json({ received: true });
-  } catch (err) {
-    return res.status(500).json({ error: err?.message || "Webhook 처리 실패" });
-  }
-});
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -267,6 +183,8 @@ app.get("/api/meta", (_req, res) => {
       id: p.id,
       name: p.name,
       monthlyPriceKrw: p.monthlyPriceKrw,
+      yearlyPriceKrw: p.yearlyPriceKrw ?? null,
+      billingCycle: p.billingCycle || "monthly",
       limits: {
         maxMonthlyRequests: p.maxMonthlyRequests,
         maxMonthlyInputTokens: p.maxMonthlyInputTokens,
@@ -274,15 +192,15 @@ app.get("/api/meta", (_req, res) => {
         maxCharsPerRequest: p.maxCharsPerRequest
       }
     })),
-    topup: TOPUP,
     billing: {
-      enabled: true,
-      provider: tossEnabled ? "toss" : "plans-only",
+      enabled: tossEnabled,
+      provider: tossEnabled ? "toss" : "disabled",
       hasPlanPrices: true,
-      hasTopupPrice: true
+      hasTopupPrice: false
     },
     auth: {
       provider: "google",
+      passwordLoginEnabled: false,
       googleEnabled: googleAuthEnabled
     }
   });
@@ -325,6 +243,18 @@ app.get("/api/auth/google/start", (req, res) => {
     prompt: "select_account"
   });
   return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+
+app.get("/api/auth/google/config", (_req, res) => {
+  const missing = [];
+  if (!env.googleClientId) missing.push("GOOGLE_CLIENT_ID");
+  if (!env.googleClientSecret) missing.push("GOOGLE_CLIENT_SECRET");
+  if (!env.googleRedirectUri && !env.appBaseUrl) missing.push("GOOGLE_REDIRECT_URI");
+  return res.json({
+    enabled: googleAuthEnabled,
+    redirectUri: env.googleRedirectUri || `${env.appBaseUrl}/api/auth/google/callback`,
+    missing
+  });
 });
 
 app.get("/api/auth/google/callback", async (req, res) => {
@@ -473,7 +403,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   if (user.plan_id === "free") {
     if ((user.free_credits_remaining ?? 0) <= 0) {
       return res.status(402).json({
-        error: "무료 5회를 모두 사용했습니다. 요금제를 선택해 주세요."
+        error: "무료 3회를 모두 사용했습니다. Pro 플랜으로 업그레이드해 주세요."
       });
     }
   } else {
@@ -485,12 +415,9 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
       (hasInputTokenLimit && monthly.input_tokens >= plan.maxMonthlyInputTokens) ||
       (hasOutputTokenLimit && monthly.output_tokens >= plan.maxMonthlyOutputTokens);
     if (requestLimitExceeded || tokenLimitExceeded) {
-      const usedBonus = consumeBonusRequest(user.id);
-      if (!usedBonus) {
-        return res.status(402).json({
-          error: "월 사용량 한도를 초과했습니다. 플랜 업그레이드 또는 추가 10회 충전이 필요합니다."
-        });
-      }
+      return res.status(402).json({
+        error: "이번 달 사용 한도를 모두 사용했습니다. 다음 달 리셋을 기다리거나 Annual 플랜을 이용해 주세요."
+      });
     }
   }
 
@@ -561,16 +488,25 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
 
 app.post("/api/billing/create-checkout", auth, async (req, res) => {
   const planId = String(req.body?.planId || "").trim();
-  if (!["pro", "business"].includes(planId)) {
+  if (!["pro_monthly", "pro_annual"].includes(planId)) {
     return res.status(400).json({ error: "지원하지 않는 플랜입니다." });
   }
-  const url = `${env.appBaseUrl}/billing/plans?target=${encodeURIComponent(planId)}`;
-  return res.json({ url });
-});
-
-app.post("/api/billing/create-topup", auth, async (req, res) => {
-  const url = `${env.appBaseUrl}/billing/plans?target=topup10`;
-  return res.json({ url });
+  if (!tossEnabled) {
+    return res.status(500).json({ error: "토스 결제가 아직 설정되지 않았습니다." });
+  }
+  const plan = pickPlan(planId);
+  const orderId = createNonce("toss");
+  createTossOrder({
+    orderId,
+    userId: req.user.id,
+    kind: "plan",
+    planId,
+    amount: plan.billingCycle === "annual" ? plan.yearlyPriceKrw : plan.monthlyPriceKrw
+  });
+  return res.json({
+    checkoutUrl: `${env.appBaseUrl}/billing/toss/checkout?orderId=${encodeURIComponent(orderId)}`,
+    orderId
+  });
 });
 
 app.get("/billing/toss/checkout", (req, res) => {
@@ -582,10 +518,10 @@ app.get("/billing/toss/checkout", (req, res) => {
 
   const isPlan = order.kind === "plan";
   const title = isPlan
-    ? order.plan_id === "pro"
-      ? "Pro 월 이용권"
-      : "Business 월 이용권"
-    : "10회 충전권";
+    ? order.plan_id === "pro_annual"
+      ? "Pro Annual 이용권"
+      : "Pro Monthly 이용권"
+    : "Polite Message Rewriter 이용권";
 
   const customerKey = `user_${order.user_id}`;
   const successUrl = `${env.appBaseUrl}/billing/toss/success?orderId=${encodeURIComponent(order.order_id)}`;
@@ -611,10 +547,12 @@ app.get("/billing/toss/checkout", (req, res) => {
     <div class="card">
       <h2>${title}</h2>
       <p><b>결제금액:</b> ${order.amount.toLocaleString("ko-KR")}원</p>
-      <p><b>Pro vs Business</b></p>
+      <p><b>포함 내용</b></p>
       <ul>
-        <li>Pro: 개인/소규모 사용, 월 100회</li>
-        <li>Business: 팀 사용, 요청/월 토큰 무제한(1회 5,000자 제한)</li>
+        <li>Free: 총 3회 체험, 1회 2,000자</li>
+        <li>Pro Monthly: 월 50회, 1회 4,000자</li>
+        <li>Pro Annual: 매달 100회, 1회 4,000자</li>
+        <li>로그인은 Google 계정만 지원합니다.</li>
       </ul>
       <button id="payBtn">토스 결제하기</button>
     </div>
@@ -669,7 +607,7 @@ app.get("/billing/toss/success", async (req, res) => {
 
     markTossOrderPaid(orderId, paymentKey);
 
-    if (order.kind === "plan" && ["pro", "business"].includes(order.plan_id || "")) {
+    if (order.kind === "plan" && ["pro_monthly", "pro_annual"].includes(order.plan_id || "")) {
       updatePlan({
         userId: order.user_id,
         planId: order.plan_id,
@@ -677,9 +615,6 @@ app.get("/billing/toss/success", async (req, res) => {
         stripeSubscriptionId: null,
         subscriptionStatus: "active"
       });
-    }
-    if (order.kind === "topup") {
-      addBonusRequests(order.user_id, TOPUP.requests);
     }
 
     return res.send("결제가 완료되었습니다. 익스텐션으로 돌아가 다시 시도해 주세요.");

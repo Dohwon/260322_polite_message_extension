@@ -10,17 +10,25 @@
     <main class="wrap">
       <header>
         <h1>Polite Rewriter</h1>
-        <p class="sub">처음 가입 시 무료 5회가 자동 제공됩니다.</p>
+        <p class="sub">무료 3회 체험 후 Pro로 이어지는 Google 로그인 전용 버전입니다.</p>
       </header>
 
       <section class="card auth-card">
-        <div class="actions">
-          <button id="googleLoginBtn" type="button">Google로 로그인</button>
-        </div>
+        <label>계정</label>
+        <p id="accountSummary" class="sub">Google 계정으로 로그인하면 백엔드에 회원으로 등록됩니다.</p>
         <p id="authStatus" class="mini-status"></p>
-
-        <div class="actions" id="logoutWrap">
+        <div class="actions">
+          <button id="googleLoginBtn" type="button">Google로 시작</button>
           <button id="logoutBtn" type="button" class="ghost">로그아웃</button>
+        </div>
+      </section>
+
+      <section class="card plans-card">
+        <label>요금제</label>
+        <p id="planSummary" class="sub">Free: 총 3회 / Pro Monthly: 월 50회 / Pro Annual: 월 100회</p>
+        <div class="actions secondary">
+          <button id="monthlyBtn" type="button" class="ghost">Pro Monthly</button>
+          <button id="annualBtn" type="button" class="ghost">Pro Annual</button>
         </div>
       </section>
 
@@ -48,14 +56,14 @@
         </select>
 
         <label for="senderRole">본인 역할</label>
-        <input id="senderRole" type="text" placeholder="예: 담임교사" />
+        <input id="senderRole" type="text" placeholder="예: 팀원, 자녀 보호자, 담임교사" />
 
         <label for="originalText">원본 문자</label>
-        <textarea id="originalText" rows="6" placeholder="여기에 원본 문장을 입력하세요"></textarea>
+        <textarea id="originalText" rows="6" placeholder="정중하게 바꾸고 싶은 원본 문장을 입력하세요"></textarea>
         <p id="originalTextError" class="field-error"></p>
 
         <div class="actions">
-          <button id="rewriteBtn" type="button">변환하기</button>
+          <button id="rewriteBtn" type="button">정중하게 다듬기</button>
           <button id="copyBtn" type="button" class="ghost">복사</button>
         </div>
 
@@ -64,14 +72,6 @@
       </section>
 
       <p id="status" class="status"></p>
-
-      <section class="card plans-card">
-        <div class="actions secondary">
-          <button id="proBtn" type="button" class="ghost">Pro 구독</button>
-          <button id="businessBtn" type="button" class="ghost">Business 구독</button>
-          <button id="topupBtn" type="button" class="ghost">+10회 충전</button>
-        </div>
-      </section>
     </main>
     <script src="popup.js"></script>
   </body>
