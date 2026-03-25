@@ -7,14 +7,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env, PLANS, TONES, RECIPIENTS } from "./config.js";
 import {
+  addBonusRequests,
   addUsage,
   clearUserSession,
-  consumeFreeCredit,
+  consumeFreeDailyUsage,
+  consumeFreeIpDailyUsage,
+  consumeBonusRequest,
   createFeedback,
   createTossOrder,
   createOrGetUser,
   dbHealth,
   ensureMonthlyUsage,
+  getFreeDailyUsage,
+  getFreeIpDailyUsage,
   getTossOrdersByUser,
   getTossOrderByOrderId,
   getCurrentMonthlyUsage,
@@ -44,6 +49,7 @@ const __dirname = path.dirname(__filename);
 const plansLandingPath = path.join(__dirname, "plans-landing.html");
 const oauthPendingStates = new Map();
 const oauthDeviceResults = new Map();
+const FREE_DAILY_LIMIT = 5;
 
 function extractResponseText(response) {
   if (typeof response?.output_text === "string" && response.output_text.trim()) {
@@ -104,6 +110,20 @@ function requestBaseUrl(req) {
   return "http://localhost:4310";
 }
 
+function normalizeClientIp(rawIp) {
+  const raw = String(rawIp || "").split(",")[0].trim();
+  if (!raw) return "";
+  if (raw === "::1") return "127.0.0.1";
+  if (raw.startsWith("::ffff:")) return raw.slice(7);
+  return raw;
+}
+
+function getRequestIpHash(req) {
+  const normalizedIp = normalizeClientIp(req.ip || req.socket?.remoteAddress);
+  if (!normalizedIp) return "";
+  return crypto.createHash("sha256").update(`${env.ipQuotaSalt}:${normalizedIp}`).digest("hex");
+}
+
 function googleRedirectUri(req) {
   return env.googleRedirectUri || `${requestBaseUrl(req)}/api/auth/google/callback`;
 }
@@ -136,8 +156,11 @@ function renderSimplePage(title, body) {
   </html>`;
 }
 
-function usageSummary(user, monthly) {
+function usageSummary(user, monthly, freeDailyUsedAccount = 0, freeDailyUsedIp = 0) {
   const plan = pickPlan(user.plan_id);
+  const safeDailyUsedAccount = Number(freeDailyUsedAccount || 0);
+  const safeDailyUsedIp = Number(freeDailyUsedIp || 0);
+  const freeDailyRemaining = Math.max(0, FREE_DAILY_LIMIT - safeDailyUsedAccount);
   return {
     planId: user.plan_id,
     planName: plan.name,
@@ -154,8 +177,12 @@ function usageSummary(user, monthly) {
       requestCount: monthly.request_count,
       inputTokens: monthly.input_tokens,
       outputTokens: monthly.output_tokens,
-      freeCreditsRemaining: user.free_credits_remaining ?? 0,
-      freeCreditsTotal: PLANS.free.maxMonthlyRequests
+      freeCreditsRemaining: freeDailyRemaining,
+      freeCreditsTotal: FREE_DAILY_LIMIT,
+      freeDailyLimit: FREE_DAILY_LIMIT,
+      freeDailyUsedAccount: safeDailyUsedAccount,
+      freeDailyUsedIp: safeDailyUsedIp,
+      bonusRequestsRemaining: user.bonus_requests_remaining ?? 0
     },
     member: {
       isRegistered: Boolean(user.id),
@@ -188,11 +215,40 @@ const rewriteLimiter = rateLimit({
   message: { error: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." }
 });
 
+const allowedOrigins =
+  env.allowedOrigins === "*"
+    ? []
+    : env.allowedOrigins
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+
 app.use(
   cors({
-    origin: env.allowedOrigins === "*" ? true : env.allowedOrigins.split(",").map((v) => v.trim()),
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "x-session-token"]
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (env.allowedOrigins === "*") return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "x-session-token"],
+    credentials: true
+  })
+);
+
+app.options(
+  "*",
+  cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (env.allowedOrigins === "*") return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "x-session-token"],
+    credentials: true
   })
 );
 
@@ -343,12 +399,15 @@ app.get("/api/auth/google/callback", async (req, res) => {
     const session = createSession(user.id, true);
     const updatedUser = setUserSession(user.id, session.token, session.expiresAt);
     const monthly = ensureMonthlyUsage(updatedUser.id);
+    const ipHash = getRequestIpHash(req);
+    const freeDaily = getFreeDailyUsage(updatedUser.id);
+    const freeIpDaily = ipHash ? getFreeIpDailyUsage(ipHash) : null;
     oauthDeviceResults.set(pending.deviceId, {
       expiresAtMs: Date.now() + 5 * 60 * 1000,
       payload: {
         sessionToken: session.token,
         email: updatedUser.email,
-        ...usageSummary(updatedUser, monthly)
+        ...usageSummary(updatedUser, monthly, freeDaily?.used_count || 0, freeIpDaily?.used_count || 0)
       }
     });
 
@@ -385,13 +444,26 @@ function auth(req, res, next) {
 }
 
 app.get("/api/me", auth, (req, res) => {
+  const ipHash = getRequestIpHash(req);
+  const freeDaily = getFreeDailyUsage(req.user.id);
+  const freeIpDaily = ipHash ? getFreeIpDailyUsage(ipHash) : null;
   const monthly = getCurrentMonthlyUsage(req.user.id);
-  res.json({ email: req.user.email, ...usageSummary(req.user, monthly) });
+  res.json({
+    email: req.user.email,
+    ...usageSummary(req.user, monthly, freeDaily?.used_count || 0, freeIpDaily?.used_count || 0)
+  });
 });
 
 app.get("/api/auth/session", auth, (req, res) => {
+  const ipHash = getRequestIpHash(req);
+  const freeDaily = getFreeDailyUsage(req.user.id);
+  const freeIpDaily = ipHash ? getFreeIpDailyUsage(ipHash) : null;
   const monthly = getCurrentMonthlyUsage(req.user.id);
-  return res.json({ ok: true, email: req.user.email, ...usageSummary(req.user, monthly) });
+  return res.json({
+    ok: true,
+    email: req.user.email,
+    ...usageSummary(req.user, monthly, freeDaily?.used_count || 0, freeIpDaily?.used_count || 0)
+  });
 });
 
 app.post("/api/auth/logout", auth, (req, res) => {
@@ -450,6 +522,76 @@ app.get("/admin/feedback", (req, res) => {
   </body></html>`);
 });
 
+app.post("/admin/credits/grant", (req, res) => {
+  if (!hasAdminAccess(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const amount = Number(req.body?.amount || 10);
+  if (!email || !email.includes("@")) {
+    return res.status(400).json({ error: "유효한 이메일이 필요합니다." });
+  }
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1000) {
+    return res.status(400).json({ error: "충전 횟수는 1~1000 범위로 입력해 주세요." });
+  }
+  const user = getUserByEmail(email);
+  if (!user) {
+    return res.status(404).json({ error: "해당 이메일 사용자를 찾을 수 없습니다." });
+  }
+  const updated = addBonusRequests(user.id, amount);
+  return res.json({
+    ok: true,
+    email: updated.email,
+    bonusRequestsRemaining: updated.bonus_requests_remaining
+  });
+});
+
+app.get("/admin/credits", (req, res) => {
+  if (!hasAdminAccess(req)) {
+    return res.status(401).send("Unauthorized");
+  }
+  return res.type("html").send(`<!doctype html>
+  <html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Credits Admin</title>
+  <style>
+    body{font-family:Pretendard,'Noto Sans KR',sans-serif;max-width:760px;margin:32px auto;padding:0 16px;color:#1f2433}
+    .card{border:1px solid #d9deea;border-radius:12px;padding:16px;background:#fff}
+    label{display:block;margin:10px 0 6px;font-weight:600;font-size:13px}
+    input,button{width:100%;padding:10px;border-radius:10px;font:inherit}
+    input{border:1px solid #ccd5ea}
+    button{border:0;background:#1b4acc;color:#fff;font-weight:700;cursor:pointer;margin-top:12px}
+    #status{margin-top:10px;font-size:13px}
+  </style></head><body>
+  <h1>관리자 충전 패널</h1>
+  <div class="card">
+    <label>사용자 이메일</label><input id="email" placeholder="user@example.com"/>
+    <label>지급 횟수</label><input id="amount" type="number" value="10" min="1" max="1000"/>
+    <button id="grantBtn">+충전 지급</button>
+    <div id="status"></div>
+  </div>
+  <script>
+    const key = new URLSearchParams(location.search).get("key") || "";
+    const statusEl = document.getElementById("status");
+    document.getElementById("grantBtn").addEventListener("click", async () => {
+      statusEl.textContent = "처리 중...";
+      try {
+        const email = document.getElementById("email").value.trim();
+        const amount = Number(document.getElementById("amount").value || 10);
+        const res = await fetch("/admin/credits/grant?key=" + encodeURIComponent(key), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, amount })
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "지급 실패");
+        statusEl.textContent = email + " 계정에 지급 완료. 현재 보너스: " + json.bonusRequestsRemaining + "회";
+      } catch (e) {
+        statusEl.textContent = String(e.message || e);
+      }
+    });
+  </script></body></html>`);
+});
+
 app.post("/admin/test/bootstrap-user", (req, res) => {
   if (!hasAdminAccess(req)) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -483,12 +625,13 @@ app.post("/admin/test/bootstrap-user", (req, res) => {
   const session = createSession(user.id, rememberMe);
   user = setUserSession(user.id, session.token, session.expiresAt);
   const monthly = ensureMonthlyUsage(user.id);
+  const freeDaily = getFreeDailyUsage(user.id);
 
   return res.json({
     ok: true,
     email: user.email,
     sessionToken: session.token,
-    ...usageSummary(user, monthly)
+    ...usageSummary(user, monthly, freeDaily?.used_count || 0, 0)
   });
 });
 
@@ -500,6 +643,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   const user = req.user;
   const plan = pickPlan(user.plan_id);
   const monthly = getCurrentMonthlyUsage(user.id);
+  const ipHash = getRequestIpHash(req);
 
   const originalText = String(req.body?.originalText || "").trim();
   const tone = sanitizeTone(req.body?.tone);
@@ -516,10 +660,20 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
     });
   }
 
+  const hasBonus = Number(user.bonus_requests_remaining || 0) > 0;
   if (user.plan_id === "free") {
-    if ((user.free_credits_remaining ?? 0) <= 0) {
+    const freeDaily = getFreeDailyUsage(user.id);
+    const accountUsedCount = Number(freeDaily?.used_count || 0);
+    const ipDaily = ipHash ? getFreeIpDailyUsage(ipHash) : null;
+    const ipUsedCount = Number(ipDaily?.used_count || 0);
+    if (!hasBonus && accountUsedCount >= FREE_DAILY_LIMIT) {
       return res.status(402).json({
-        error: "무료 사용량을 모두 사용했습니다. 요금제 페이지에서 업그레이드해 주세요."
+        error: `오늘 계정 무료 사용 ${FREE_DAILY_LIMIT}회를 모두 사용했습니다. 내일 다시 초기화됩니다.`
+      });
+    }
+    if (ipHash && ipUsedCount >= FREE_DAILY_LIMIT && !hasBonus) {
+      return res.status(429).json({
+        error: `오늘 현재 네트워크(IP)의 무료 사용 ${FREE_DAILY_LIMIT}회를 모두 사용했습니다. 내일 다시 초기화됩니다.`
       });
     }
   } else {
@@ -530,9 +684,9 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
     const tokenLimitExceeded =
       (hasInputTokenLimit && monthly.input_tokens >= plan.maxMonthlyInputTokens) ||
       (hasOutputTokenLimit && monthly.output_tokens >= plan.maxMonthlyOutputTokens);
-    if (requestLimitExceeded || tokenLimitExceeded) {
+    if ((requestLimitExceeded || tokenLimitExceeded) && !hasBonus) {
       return res.status(402).json({
-        error: "이번 달 사용 한도를 모두 사용했습니다. 다음 달 리셋을 기다리거나 Annual 플랜을 이용해 주세요."
+        error: "이번 달 사용 한도를 모두 사용했습니다. 준비중인 10회 추가 기능 오픈 후 계속 사용할 수 있습니다."
       });
     }
   }
@@ -580,10 +734,23 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
     }
 
     const updated = addUsage(user.id, inputTokens, outputTokens);
-    if (user.plan_id === "free") {
-      consumeFreeCredit(user.id);
+    if (hasBonus) {
+      consumeBonusRequest(user.id);
+    } else if (user.plan_id === "free") {
+      const consumedAccount = consumeFreeDailyUsage(user.id, FREE_DAILY_LIMIT);
+      if (!consumedAccount) {
+        return res.status(402).json({ error: "오늘 계정 무료 사용량이 이미 소진되었습니다." });
+      }
+      if (ipHash) {
+        const consumedIp = consumeFreeIpDailyUsage(ipHash, FREE_DAILY_LIMIT);
+        if (!consumedIp) {
+          return res.status(429).json({ error: "오늘 현재 네트워크(IP)의 무료 사용량 5회가 모두 소진되었습니다." });
+        }
+      }
     }
     const refreshedUser = req.user;
+    const freeDailyAfter = getFreeDailyUsage(user.id);
+    const freeIpDailyAfter = ipHash ? getFreeIpDailyUsage(ipHash) : null;
 
     if (!rewritten) {
       return res.status(502).json({ error: "변환 결과를 생성하지 못했습니다. 다시 시도해 주세요." });
@@ -594,7 +761,12 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
       usage: {
         inputTokens,
         outputTokens,
-        monthly: usageSummary(refreshedUser, updated).usage
+        monthly: usageSummary(
+          refreshedUser,
+          updated,
+          freeDailyAfter?.used_count || 0,
+          freeIpDailyAfter?.used_count || 0
+        ).usage
       }
     });
   } catch (err) {
@@ -603,6 +775,11 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
 });
 
 app.post("/api/billing/create-checkout", auth, async (req, res) => {
+  if (!env.billingCheckoutEnabled) {
+    return res.status(503).json({
+      error: "결제 기능은 현재 준비중입니다. 무료 버전만 먼저 운영 중입니다."
+    });
+  }
   const planId = String(req.body?.planId || "").trim();
   if (!["pro_monthly", "pro_annual"].includes(planId)) {
     return res.status(400).json({ error: "지원하지 않는 플랜입니다." });

@@ -67,6 +67,37 @@ CREATE TABLE IF NOT EXISTS feedback_posts (
   message TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS free_ip_usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip_hash TEXT UNIQUE NOT NULL,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  first_used_at TEXT,
+  last_used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS free_daily_usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  date_key TEXT NOT NULL,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, date_key),
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS free_ip_daily_usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip_hash TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(ip_hash, date_key)
+);
 `);
 
 function safeAddColumn(sql) {
@@ -204,6 +235,57 @@ const listFeedbackStmt = db.prepare(`
   ORDER BY id DESC
   LIMIT ?
 `);
+const upsertFreeIpUsageStmt = db.prepare(`
+  INSERT INTO free_ip_usage (ip_hash)
+  VALUES (?)
+  ON CONFLICT(ip_hash) DO NOTHING
+`);
+const getFreeIpUsageByHashStmt = db.prepare(`
+  SELECT ip_hash, used_count, first_used_at, last_used_at
+  FROM free_ip_usage
+  WHERE ip_hash = ?
+`);
+const consumeFreeIpCreditStmt = db.prepare(`
+  UPDATE free_ip_usage
+  SET used_count = used_count + 1,
+      first_used_at = COALESCE(first_used_at, CURRENT_TIMESTAMP),
+      last_used_at = CURRENT_TIMESTAMP,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE ip_hash = ?
+    AND used_count < ?
+`);
+const upsertFreeDailyUsageStmt = db.prepare(`
+  INSERT INTO free_daily_usage (user_id, date_key)
+  VALUES (?, ?)
+  ON CONFLICT(user_id, date_key) DO NOTHING
+`);
+const getFreeDailyUsageStmt = db.prepare(`
+  SELECT user_id, date_key, used_count
+  FROM free_daily_usage
+  WHERE user_id = ? AND date_key = ?
+`);
+const consumeFreeDailyUsageStmt = db.prepare(`
+  UPDATE free_daily_usage
+  SET used_count = used_count + 1,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE user_id = ? AND date_key = ? AND used_count < ?
+`);
+const upsertFreeIpDailyUsageStmt = db.prepare(`
+  INSERT INTO free_ip_daily_usage (ip_hash, date_key)
+  VALUES (?, ?)
+  ON CONFLICT(ip_hash, date_key) DO NOTHING
+`);
+const getFreeIpDailyUsageStmt = db.prepare(`
+  SELECT ip_hash, date_key, used_count
+  FROM free_ip_daily_usage
+  WHERE ip_hash = ? AND date_key = ?
+`);
+const consumeFreeIpDailyUsageStmt = db.prepare(`
+  UPDATE free_ip_daily_usage
+  SET used_count = used_count + 1,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE ip_hash = ? AND date_key = ? AND used_count < ?
+`);
 const setSessionStmt = db.prepare(`
   UPDATE users
   SET session_token = ?,
@@ -261,6 +343,15 @@ function monthKey(date = new Date()) {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
+}
+
+function dayKeyKst(date = new Date()) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
 }
 
 normalizeLegacyFreeCreditsStmt.run();
@@ -403,6 +494,47 @@ export function linkGoogleAccount(userId, { googleSub, googleName, googlePicture
   return getUserByIdStmt.get(userId);
 }
 
+export function getFreeIpUsage(ipHash) {
+  if (!ipHash) return null;
+  upsertFreeIpUsageStmt.run(ipHash);
+  return getFreeIpUsageByHashStmt.get(ipHash);
+}
+
+export function consumeFreeIpCredit(ipHash, limit = 5) {
+  if (!ipHash) return false;
+  upsertFreeIpUsageStmt.run(ipHash);
+  const safeLimit = Number(limit) > 0 ? Number(limit) : 5;
+  const info = consumeFreeIpCreditStmt.run(ipHash, safeLimit);
+  return info.changes > 0;
+}
+
+export function getFreeDailyUsage(userId, dateKey = dayKeyKst()) {
+  if (!userId) return null;
+  upsertFreeDailyUsageStmt.run(userId, dateKey);
+  return getFreeDailyUsageStmt.get(userId, dateKey);
+}
+
+export function consumeFreeDailyUsage(userId, limit = 5, dateKey = dayKeyKst()) {
+  if (!userId) return false;
+  const safeLimit = Number(limit) > 0 ? Number(limit) : 5;
+  upsertFreeDailyUsageStmt.run(userId, dateKey);
+  const info = consumeFreeDailyUsageStmt.run(userId, dateKey, safeLimit);
+  return info.changes > 0;
+}
+
+export function getFreeIpDailyUsage(ipHash, dateKey = dayKeyKst()) {
+  if (!ipHash) return null;
+  upsertFreeIpDailyUsageStmt.run(ipHash, dateKey);
+  return getFreeIpDailyUsageStmt.get(ipHash, dateKey);
+}
+
+export function consumeFreeIpDailyUsage(ipHash, limit = 5, dateKey = dayKeyKst()) {
+  if (!ipHash) return false;
+  const safeLimit = Number(limit) > 0 ? Number(limit) : 5;
+  upsertFreeIpDailyUsageStmt.run(ipHash, dateKey);
+  const info = consumeFreeIpDailyUsageStmt.run(ipHash, dateKey, safeLimit);
+  return info.changes > 0;
+}
 
 export function createFeedback({ email, topic, message }) {
   insertFeedbackStmt.run(String(email || "").trim().toLowerCase(), String(topic || "").trim(), String(message || "").trim());

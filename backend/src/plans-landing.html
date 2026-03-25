@@ -203,7 +203,7 @@
               <li>서버 기반 사용량 집계</li>
               <li>Google 계정 기준 플랜 유지</li>
             </ul>
-            <button id="buyMonthlyBtn" type="button">Pro Monthly 결제</button>
+            <button id="buyMonthlyBtn" type="button">신청폼 작성</button>
           </article>
 
           <article class="card">
@@ -217,7 +217,7 @@
               <li>장기 사용량에 적합</li>
               <li>동일 Google 계정으로 연동</li>
             </ul>
-            <button id="buyAnnualBtn" type="button" class="secondary">Pro Annual 결제</button>
+            <button id="buyAnnualBtn" type="button" class="secondary">송금/문의 안내</button>
           </article>
         </div>
       </section>
@@ -270,22 +270,21 @@
         }
       }
 
-      async function startCheckout(planId) {
-        try {
-          const res = await fetch(`${apiBaseUrl}/api/billing/create-checkout`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-session-token": sessionToken
-            },
-            body: JSON.stringify({ planId })
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || "결제 링크 생성 실패");
-          window.location.href = json.checkoutUrl;
-        } catch (err) {
-          setMemberStatus(String(err.message || err), "error");
+      function openManualGuide(planId) {
+        const topicInput = document.getElementById("feedbackTopic");
+        const msgInput = document.getElementById("feedbackMessage");
+        if (planId === "pro_monthly") {
+          topicInput.value = "Pro Monthly 신청";
+          msgInput.value = "신청 이메일: \\n원하는 플랜: Pro Monthly\\n결제 방식: 계좌이체/토스송금\\n";
+        } else if (planId === "pro_annual") {
+          topicInput.value = "Pro Annual 신청";
+          msgInput.value = "신청 이메일: \\n원하는 플랜: Pro Annual\\n결제 방식: 계좌이체/토스송금\\n";
+        } else {
+          topicInput.value = "10회 충전 신청";
+          msgInput.value = "신청 이메일: \\n원하는 충전: 10회(1,000원)\\n결제 방식: 계좌이체/토스송금\\n";
         }
+        feedbackForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        setFeedbackStatus("아래 신청폼을 작성해 주세요. 확인 후 운영자가 계정별로 수동 충전/플랜 적용합니다.");
       }
 
       feedbackForm.addEventListener("submit", async (event) => {
@@ -313,8 +312,8 @@
         }
       });
 
-      buyMonthlyBtn.addEventListener("click", () => startCheckout("pro_monthly"));
-      buyAnnualBtn.addEventListener("click", () => startCheckout("pro_annual"));
+      buyMonthlyBtn.addEventListener("click", () => openManualGuide("pro_monthly"));
+      buyAnnualBtn.addEventListener("click", () => openManualGuide("pro_annual"));
 
       fetchSession().then(() => {
         if (target === "pro_monthly") buyMonthlyBtn.focus();

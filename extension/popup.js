@@ -1,6 +1,15 @@
 const LIVE_API_BASE_URL = "https://polite-message-rewriter-production.up.railway.app";
 const DEFAULT_API_BASE_URL = LIVE_API_BASE_URL;
 
+const STORAGE_KEYS = {
+  sessionToken: "sessionToken",
+  pendingGoogleDeviceId: "pendingGoogleDeviceId",
+  pendingGoogleStartedAt: "pendingGoogleStartedAt",
+  tone: "tone",
+  recipient: "recipient",
+  senderRole: "senderRole"
+};
+
 const els = {
   accountSummary: document.getElementById("accountSummary"),
   authStatus: document.getElementById("authStatus"),
@@ -16,47 +25,59 @@ const els = {
   rewrittenText: document.getElementById("rewrittenText"),
   rewriteBtn: document.getElementById("rewriteBtn"),
   copyBtn: document.getElementById("copyBtn"),
-  monthlyBtn: document.getElementById("monthlyBtn"),
-  annualBtn: document.getElementById("annualBtn"),
+  proBtn: document.getElementById("proBtn"),
+  businessBtn: document.getElementById("businessBtn"),
+  topupBtn: document.getElementById("topupBtn"),
   status: document.getElementById("status")
 };
 
 const state = {
   apiBaseUrl: DEFAULT_API_BASE_URL,
   sessionToken: "",
-  user: null
+  user: null,
+  isPollingGoogleLogin: false
 };
 
 function setStatus(message, variant = "info") {
-  els.status.textContent = message;
+  if (!els.status) return;
+  els.status.textContent = message || "";
   els.status.classList.remove("error", "success");
   if (variant === "error") els.status.classList.add("error");
   if (variant === "success") els.status.classList.add("success");
 }
 
 function setAuthStatus(message, variant = "info") {
-  els.authStatus.textContent = message;
+  if (!els.authStatus) return;
+  els.authStatus.textContent = message || "";
   els.authStatus.classList.remove("error", "success");
   if (variant === "error") els.authStatus.classList.add("error");
   if (variant === "success") els.authStatus.classList.add("success");
 }
 
 function setFieldError(inputEl, errorEl, message) {
+  if (!inputEl || !errorEl) return;
   errorEl.textContent = message || "";
   inputEl.classList.toggle("invalid", Boolean(message));
 }
 
 function validateOriginalText() {
-  const text = els.originalText.value.trim();
+  const text = els.originalText?.value?.trim() || "";
   const limit = state.user?.limits?.maxCharsPerRequest || 2000;
+
   if (!text) {
     setFieldError(els.originalText, els.originalTextError, "원본 문장을 입력해 주세요.");
     return false;
   }
+
   if (text.length > limit) {
-    setFieldError(els.originalText, els.originalTextError, `현재 플랜은 1회 ${limit}자까지 입력할 수 있습니다.`);
+    setFieldError(
+      els.originalText,
+      els.originalTextError,
+      `현재 플랜은 1회 ${limit}자까지 입력할 수 있습니다.`
+    );
     return false;
   }
+
   setFieldError(els.originalText, els.originalTextError, "");
   return true;
 }
@@ -64,86 +85,147 @@ function validateOriginalText() {
 function normalizeFetchError(err) {
   const msg = String(err?.message || "");
   if (msg.includes("Failed to fetch")) {
-    return "서버 연결에 실패했습니다. 개발자 모드면 백엔드를 먼저 켜 주세요.";
+    return "서버 연결에 실패했습니다. 백엔드 주소와 CORS 설정을 확인해 주세요.";
   }
   return msg || "요청 처리 중 오류가 발생했습니다.";
 }
 
-async function saveLocalState() {
-  await chrome.storage.sync.set({
-    tone: els.tone.value,
-    recipient: els.recipient.value,
-    senderRole: els.senderRole.value.trim()
-  });
-
-  if (state.sessionToken) {
-    await chrome.storage.local.set({ sessionToken: state.sessionToken });
-  } else {
-    await chrome.storage.local.remove(["sessionToken"]);
-  }
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function loadLocalState() {
-  const sync = await chrome.storage.sync.get(["tone", "recipient", "senderRole"]);
-  const local = await chrome.storage.local.get(["sessionToken"]);
+function usageText(user) {
+  if (!user?.usage || !user?.limits) return "";
 
-  els.tone.value = sync.tone || "정중하게";
-  els.recipient.value = sync.recipient || "기타";
-  els.senderRole.value = sync.senderRole || "";
-  state.sessionToken = local.sessionToken || "";
+  const used = Number(user.usage.requestCount || 0);
+  const limit = Number(user.limits.maxMonthlyRequests || 0);
+
+  if (user.planId === "free") {
+    const accountUsed = Number(user.usage.freeDailyUsedAccount || 0);
+    const ipUsed = Number(user.usage.freeDailyUsedIp || 0);
+    return `일일 무료 ${user.usage.freeCreditsRemaining}/${user.usage.freeCreditsTotal}회 남음 (계정 ${accountUsed}/5 · IP ${ipUsed}/5)`;
+  }
+
+  return `${user.planName} · 이번 달 ${used}/${limit}회 사용 · 보너스 ${user.usage.bonusRequestsRemaining || 0}회`;
 }
 
 function authHeaders() {
   return {
     "Content-Type": "application/json",
-    "x-session-token": state.sessionToken
+    "x-session-token": state.sessionToken || ""
   };
-}
-
-function usageText(user) {
-  if (!user?.usage || !user?.limits) return "";
-  const used = Number(user.usage.requestCount || 0);
-  const limit = Number(user.limits.maxMonthlyRequests || 0);
-  if (user.planId === "free") {
-    return `무료 ${user.usage.freeCreditsRemaining}/${user.usage.freeCreditsTotal}회 남음 · 월 토큰 ${user.limits.maxMonthlyInputTokens} 제한`;
-  }
-  return `${user.planName} · 이번 달 ${used}/${limit}회 사용 · 1회 ${user.limits.maxCharsPerRequest}자`;
 }
 
 function updateAuthUI() {
   const isLoggedIn = Boolean(state.user);
-  els.googleLoginBtn.disabled = isLoggedIn;
-  els.logoutBtn.disabled = !isLoggedIn;
-  els.logoutBtn.classList.toggle("hidden", !isLoggedIn);
-  els.rewriteBtn.disabled = !isLoggedIn;
-  els.monthlyBtn.disabled = !isLoggedIn;
-  els.annualBtn.disabled = !isLoggedIn;
+  const loginPending = state.isPollingGoogleLogin;
+
+  if (els.googleLoginBtn) els.googleLoginBtn.disabled = isLoggedIn || loginPending;
+  if (els.logoutBtn) {
+    els.logoutBtn.disabled = !isLoggedIn;
+    els.logoutBtn.classList.toggle("hidden", !isLoggedIn);
+  }
+  if (els.rewriteBtn) els.rewriteBtn.disabled = !isLoggedIn;
+
+  if (els.proBtn) els.proBtn.disabled = true;
+  if (els.businessBtn) els.businessBtn.disabled = true;
+  if (els.topupBtn) els.topupBtn.disabled = true;
 
   if (!isLoggedIn) {
-    els.accountSummary.textContent = "Google 계정으로 로그인하면 백엔드에 회원으로 등록되고 Free 5회가 자동 지급됩니다.";
-    els.planSummary.textContent = "Free: 총 5회 + 월 100토큰 / Pro Monthly: 월 50회 / Pro Annual: 월 100회";
+    if (els.accountSummary) {
+      els.accountSummary.textContent =
+        "Google 계정으로 로그인하면 Free 일일 5회(계정/IP 각각 제한)로 시작합니다.";
+    }
+    if (els.planSummary) {
+      els.planSummary.textContent =
+        loginPending
+          ? "Google 로그인 확인 중입니다..."
+          : "Free 일일 제한: 계정 5회 + IP 5회 / PRO / Business / 10회 추가는 준비중";
+    }
     return;
   }
 
-  els.accountSummary.textContent = `${state.user.email} · ${state.user.member?.authProvider || "google"} 로그인 · ${state.user.member?.isRegistered ? "회원 등록 완료" : "미등록"}`;
-  els.planSummary.textContent = usageText(state.user);
+  if (els.accountSummary) {
+    els.accountSummary.textContent = `${state.user.email} · ${
+      state.user.member?.authProvider || "google"
+    } 로그인 · ${state.user.member?.isRegistered ? "회원 등록 완료" : "미등록"}`;
+  }
+
+  if (els.planSummary) {
+    els.planSummary.textContent = usageText(state.user);
+  }
+}
+
+async function saveLocalState() {
+  await chrome.storage.sync.set({
+    [STORAGE_KEYS.tone]: els.tone?.value || "정중하게",
+    [STORAGE_KEYS.recipient]: els.recipient?.value || "기타",
+    [STORAGE_KEYS.senderRole]: els.senderRole?.value?.trim() || ""
+  });
+
+  if (state.sessionToken) {
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.sessionToken]: state.sessionToken
+    });
+  } else {
+    await chrome.storage.local.remove([STORAGE_KEYS.sessionToken]);
+  }
+}
+
+async function loadLocalState() {
+  const sync = await chrome.storage.sync.get([
+    STORAGE_KEYS.tone,
+    STORAGE_KEYS.recipient,
+    STORAGE_KEYS.senderRole
+  ]);
+
+  const local = await chrome.storage.local.get([
+    STORAGE_KEYS.sessionToken,
+    STORAGE_KEYS.pendingGoogleDeviceId,
+    STORAGE_KEYS.pendingGoogleStartedAt
+  ]);
+
+  if (els.tone) els.tone.value = sync[STORAGE_KEYS.tone] || "정중하게";
+  if (els.recipient) els.recipient.value = sync[STORAGE_KEYS.recipient] || "기타";
+  if (els.senderRole) els.senderRole.value = sync[STORAGE_KEYS.senderRole] || "";
+
+  state.sessionToken = local[STORAGE_KEYS.sessionToken] || "";
+  return {
+    pendingGoogleDeviceId: local[STORAGE_KEYS.pendingGoogleDeviceId] || "",
+    pendingGoogleStartedAt: Number(local[STORAGE_KEYS.pendingGoogleStartedAt] || 0)
+  };
+}
+
+async function clearPendingGoogleLogin() {
+  state.isPollingGoogleLogin = false;
+  await chrome.storage.local.remove([
+    STORAGE_KEYS.pendingGoogleDeviceId,
+    STORAGE_KEYS.pendingGoogleStartedAt
+  ]);
+  updateAuthUI();
 }
 
 async function refreshSession() {
   if (!state.sessionToken) {
     state.user = null;
     updateAuthUI();
-    setStatus("Google 로그인 후 사용할 수 있습니다. Free 5회 체험이 먼저 제공됩니다.");
+    setStatus("Google 로그인 후 사용할 수 있습니다. Free 일일 5회(계정/IP 각각 제한)가 제공됩니다.");
     return;
   }
 
   try {
     const res = await fetch(`${state.apiBaseUrl}/api/auth/session`, {
       method: "GET",
-      headers: { "x-session-token": state.sessionToken }
+      headers: {
+        "x-session-token": state.sessionToken
+      }
     });
+
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || "세션 만료");
+
+    if (!res.ok) {
+      throw new Error(json.error || "세션 만료");
+    }
 
     state.user = json;
     updateAuthUI();
@@ -152,37 +234,53 @@ async function refreshSession() {
   } catch (err) {
     state.user = null;
     state.sessionToken = "";
-    await chrome.storage.local.remove(["sessionToken"]);
+    await chrome.storage.local.remove([STORAGE_KEYS.sessionToken]);
     updateAuthUI();
     setAuthStatus("세션이 만료되었습니다.", "error");
     setStatus(normalizeFetchError(err), "error");
   }
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function createDeviceId() {
+  return `ext_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
 }
 
-async function loginWithGoogle() {
+async function pollGoogleLogin(deviceId, { silent = false } = {}) {
+  if (!deviceId) return;
+  if (state.isPollingGoogleLogin) return;
+
+  state.isPollingGoogleLogin = true;
+  updateAuthUI();
+
+  if (!silent) {
+    setAuthStatus("Google 로그인 확인 중...", "success");
+    setStatus("브라우저 탭에서 Google 로그인을 완료한 뒤, 이 창을 다시 열면 자동 연결됩니다.");
+  }
+
   try {
-    els.googleLoginBtn.disabled = true;
-    setAuthStatus("Google 로그인 창을 여는 중...", "success");
-    setStatus("브라우저 탭에서 Google 로그인을 완료해 주세요.");
-
-    const deviceId = `ext_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
-    const loginUrl = `${state.apiBaseUrl}/api/auth/google/start?deviceId=${encodeURIComponent(deviceId)}`;
-    await chrome.tabs.create({ url: loginUrl });
-
     for (let attempt = 0; attempt < 90; attempt += 1) {
       await delay(2000);
-      const res = await fetch(`${state.apiBaseUrl}/api/auth/google/poll?deviceId=${encodeURIComponent(deviceId)}`);
+
+      const res = await fetch(
+        `${state.apiBaseUrl}/api/auth/google/poll?deviceId=${encodeURIComponent(deviceId)}`
+      );
+
       const json = await res.json();
-      if (res.status === 202) continue;
-      if (!res.ok) throw new Error(json.error || "Google 로그인 확인에 실패했습니다.");
+
+      if (res.status === 202) {
+        continue;
+      }
+
+      if (!res.ok) {
+        throw new Error(json.error || "Google 로그인 확인에 실패했습니다.");
+      }
 
       state.sessionToken = json.sessionToken || "";
       state.user = json;
+
       await saveLocalState();
+      await clearPendingGoogleLogin();
+
       updateAuthUI();
       setAuthStatus("Google 로그인 완료", "success");
       setStatus(`로그인 완료 | ${usageText(json)}`, "success");
@@ -191,10 +289,57 @@ async function loginWithGoogle() {
 
     throw new Error("로그인 확인 시간이 초과되었습니다. 다시 시도해 주세요.");
   } catch (err) {
+    await clearPendingGoogleLogin();
     setAuthStatus(normalizeFetchError(err), "error");
     setStatus(normalizeFetchError(err), "error");
   } finally {
-    els.googleLoginBtn.disabled = Boolean(state.user);
+    state.isPollingGoogleLogin = false;
+    updateAuthUI();
+  }
+}
+
+async function resumePendingGoogleLoginIfExists(pendingGoogleDeviceId, pendingGoogleStartedAt) {
+  if (!pendingGoogleDeviceId) return;
+
+  const isExpired =
+    !pendingGoogleStartedAt || Date.now() - pendingGoogleStartedAt > 10 * 60 * 1000;
+
+  if (isExpired) {
+    await clearPendingGoogleLogin();
+    return;
+  }
+
+  await pollGoogleLogin(pendingGoogleDeviceId, { silent: true });
+}
+
+async function loginWithGoogle() {
+  try {
+    const deviceId = createDeviceId();
+
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.pendingGoogleDeviceId]: deviceId,
+      [STORAGE_KEYS.pendingGoogleStartedAt]: Date.now()
+    });
+
+    state.isPollingGoogleLogin = true;
+    updateAuthUI();
+
+    setAuthStatus("Google 로그인 창을 여는 중...", "success");
+    setStatus("브라우저 탭에서 Google 로그인을 완료해 주세요. 창을 닫아도 다시 열면 자동 연결됩니다.");
+
+    const loginUrl = `${state.apiBaseUrl}/api/auth/google/start?deviceId=${encodeURIComponent(deviceId)}`;
+    await chrome.tabs.create({ url: loginUrl });
+
+    // popup이 살아있는 동안은 바로 polling 시작
+    pollGoogleLogin(deviceId).catch((err) => {
+      setAuthStatus(normalizeFetchError(err), "error");
+      setStatus(normalizeFetchError(err), "error");
+    });
+  } catch (err) {
+    state.isPollingGoogleLogin = false;
+    updateAuthUI();
+    setAuthStatus(normalizeFetchError(err), "error");
+    setStatus(normalizeFetchError(err), "error");
   }
 }
 
@@ -207,7 +352,9 @@ async function logout() {
   try {
     await fetch(`${state.apiBaseUrl}/api/auth/logout`, {
       method: "POST",
-      headers: { "x-session-token": state.sessionToken }
+      headers: {
+        "x-session-token": state.sessionToken
+      }
     });
   } catch {
     // ignore
@@ -215,7 +362,13 @@ async function logout() {
 
   state.sessionToken = "";
   state.user = null;
-  await chrome.storage.local.remove(["sessionToken"]);
+
+  await chrome.storage.local.remove([
+    STORAGE_KEYS.sessionToken,
+    STORAGE_KEYS.pendingGoogleDeviceId,
+    STORAGE_KEYS.pendingGoogleStartedAt
+  ]);
+
   updateAuthUI();
   setAuthStatus("");
   setStatus("로그아웃 되었습니다.", "success");
@@ -226,12 +379,13 @@ async function rewrite() {
     setStatus("Google 로그인 후 사용할 수 있습니다.", "error");
     return;
   }
+
   if (!validateOriginalText()) {
     setStatus("입력 내용을 확인해 주세요.", "error");
     return;
   }
 
-  els.rewriteBtn.disabled = true;
+  if (els.rewriteBtn) els.rewriteBtn.disabled = true;
   setStatus("정중한 문장으로 다듬는 중...");
 
   try {
@@ -239,31 +393,39 @@ async function rewrite() {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({
-        originalText: els.originalText.value.trim(),
-        tone: els.tone.value,
-        recipient: els.recipient.value,
-        senderRole: els.senderRole.value.trim() || "발신자"
+        originalText: els.originalText?.value?.trim() || "",
+        tone: els.tone?.value || "정중하게",
+        recipient: els.recipient?.value || "기타",
+        senderRole: els.senderRole?.value?.trim() || "발신자"
       })
     });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || "변환 실패");
 
-    els.rewrittenText.value = json.rewrittenText || "";
+    const json = await res.json();
+
+    if (!res.ok) {
+      throw new Error(json.error || "변환 실패");
+    }
+
+    if (els.rewrittenText) {
+      els.rewrittenText.value = json.rewrittenText || "";
+    }
+
     await refreshSession();
     setStatus(`완료 | ${usageText(state.user)}`, "success");
   } catch (err) {
     setStatus(normalizeFetchError(err), "error");
   } finally {
-    els.rewriteBtn.disabled = false;
+    if (els.rewriteBtn) els.rewriteBtn.disabled = false;
   }
 }
 
 async function copyResult() {
-  const text = els.rewrittenText.value.trim();
+  const text = els.rewrittenText?.value?.trim() || "";
   if (!text) {
     setStatus("복사할 결과가 없습니다.", "error");
     return;
   }
+
   try {
     await navigator.clipboard.writeText(text);
     setStatus("변환 결과를 복사했습니다.", "success");
@@ -276,29 +438,43 @@ async function goPlans(target) {
   const params = new URLSearchParams();
   if (target) params.set("target", target);
   if (state.sessionToken) params.set("sessionToken", state.sessionToken);
+
   const qs = params.toString();
   const url = `${state.apiBaseUrl}/billing/plans${qs ? `?${qs}` : ""}`;
   await chrome.tabs.create({ url });
 }
 
-els.originalText.addEventListener("input", validateOriginalText);
-els.googleLoginBtn.addEventListener("click", loginWithGoogle);
-els.logoutBtn.addEventListener("click", logout);
-els.rewriteBtn.addEventListener("click", rewrite);
-els.copyBtn.addEventListener("click", copyResult);
-els.plansInfoBtn.addEventListener("click", () => goPlans(""));
-els.monthlyBtn.addEventListener("click", () => goPlans("pro_monthly"));
-els.annualBtn.addEventListener("click", () => goPlans("pro_annual"));
+function safeBind(element, eventName, handler, elementName) {
+  if (!element) {
+    console.warn(`[popup] missing element: ${elementName}`);
+    return;
+  }
+  element.addEventListener(eventName, handler);
+}
+
+safeBind(els.originalText, "input", validateOriginalText, "originalText");
+safeBind(els.googleLoginBtn, "click", loginWithGoogle, "googleLoginBtn");
+safeBind(els.logoutBtn, "click", logout, "logoutBtn");
+safeBind(els.rewriteBtn, "click", rewrite, "rewriteBtn");
+safeBind(els.copyBtn, "click", copyResult, "copyBtn");
+safeBind(els.plansInfoBtn, "click", () => goPlans(""), "plansInfoBtn");
+safeBind(els.proBtn, "click", () => goPlans("pro"), "proBtn");
+safeBind(els.businessBtn, "click", () => goPlans("business"), "businessBtn");
+safeBind(els.topupBtn, "click", () => goPlans("topup10"), "topupBtn");
 
 [els.tone, els.recipient, els.senderRole].forEach((el) => {
-  el.addEventListener("change", saveLocalState);
+  safeBind(el, "change", saveLocalState, "settingsField");
 });
 
 (async () => {
   try {
-    await loadLocalState();
+    const local = await loadLocalState();
     updateAuthUI();
     await refreshSession();
+    await resumePendingGoogleLoginIfExists(
+      local.pendingGoogleDeviceId,
+      local.pendingGoogleStartedAt
+    );
     validateOriginalText();
   } catch (err) {
     setStatus(`초기화 오류: ${err?.message || "unknown"}`, "error");

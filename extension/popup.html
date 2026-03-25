@@ -10,7 +10,7 @@
     <main class="wrap">
       <header>
         <h1>Polite Rewriter</h1>
-        <p class="sub">무료 5회 + 월 100토큰 체험 후 Pro로 이어지는 Google 로그인 전용 버전입니다.</p>
+        <p class="sub">Google 로그인 후 일일 무료 5회(계정/IP 기준) 사용 가능한 버전입니다.</p>
       </header>
 
       <section class="card auth-card">
@@ -26,12 +26,19 @@
       <section class="card plans-card">
         <div class="label-row">
           <label>요금제</label>
-          <button id="plansInfoBtn" type="button" class="icon-btn" title="요금제 페이지 열기">?</button>
+          <button id="plansInfoBtn" type="button" class="icon-btn" title="요금제 정책 보기">?</button>
         </div>
-        <p id="planSummary" class="sub">Free: 총 5회 + 월 100토큰 / Pro Monthly: 월 50회 / Pro Annual: 월 100회</p>
+        <p id="planSummary" class="sub">Free 일일 제한: 계정 5회 + IP 5회 / PRO / Business / 10회 추가는 준비중</p>
         <div class="actions secondary">
-          <button id="monthlyBtn" type="button" class="ghost">Pro Monthly</button>
-          <button id="annualBtn" type="button" class="ghost">Pro Annual</button>
+          <button id="proBtn" type="button" class="ghost">PRO</button>
+          <button id="businessBtn" type="button" class="ghost">Business</button>
+        </div>
+        <div class="actions secondary">
+          <button id="topupBtn" type="button" class="ghost">10회 추가</button>
+        </div>
+        <div class="plans-overlay" aria-hidden="true">
+          <strong>준비중</strong>
+          <span>PRO / Business / 10회 추가 기능은 곧 오픈됩니다.</span>
         </div>
       </section>
 
