@@ -50,11 +50,28 @@ const plansLandingPath = path.join(__dirname, "plans-landing.html");
 const oauthPendingStates = new Map();
 const oauthDeviceResults = new Map();
 const FREE_DAILY_LIMIT = 5;
+
+function normalizeEmailForBypass(email) {
+  const raw = String(email || "").trim().toLowerCase();
+  if (!raw || !raw.includes("@")) return raw;
+  const [localRaw, domainRaw] = raw.split("@");
+  const domain = domainRaw || "";
+  let local = localRaw || "";
+  if (domain === "gmail.com" || domain === "googlemail.com") {
+    local = local.split("+")[0].replace(/\./g, "");
+    return `${local}@gmail.com`;
+  }
+  return `${local}@${domain}`;
+}
+
 const unlimitedBypassEmailSet = new Set(
-  String(env.unlimitedBypassEmails || "")
-    .split(",")
-    .map((v) => v.trim().toLowerCase())
-    .filter(Boolean)
+  [
+    "dowonkim0612@gmail.com",
+    ...String(env.unlimitedBypassEmails || "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean)
+  ].map((email) => normalizeEmailForBypass(email))
 );
 
 function extractResponseText(response) {
@@ -103,7 +120,7 @@ function createNonce(prefix) {
 }
 
 function isUnlimitedBypassUser(user) {
-  const email = String(user?.email || "").trim().toLowerCase();
+  const email = normalizeEmailForBypass(user?.email || "");
   return Boolean(email) && unlimitedBypassEmailSet.has(email);
 }
 
