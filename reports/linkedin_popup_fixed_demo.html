@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Polite Rewriter Popup Demo</title>
+  <style>
+    :root {
+      --bg: #f7f9fb;
+      --line: #d7dbe7;
+      --text: #191c1e;
+      --muted: #57657a;
+      --primary: #093471;
+      --primary-2: #294c8a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: radial-gradient(circle at 0% 0%, #d9e5ff 0%, transparent 38%), radial-gradient(circle at 100% 100%, #ecf2ff 0%, transparent 48%), var(--bg);
+      font-family: "Inter", "Noto Sans KR", sans-serif;
+      color: var(--text);
+    }
+    .popup {
+      width: 420px;
+      margin: 0 auto;
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid #e4e7f1;
+      box-shadow: 0 20px 42px -28px rgba(25, 28, 30, 0.25);
+    }
+    h1 { margin: 0; font-size: 18px; color: var(--primary); }
+    .sub { margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
+    label { display:block; margin:8px 0 4px; font-size:12px; color:var(--muted); font-weight:600; }
+    select, input, textarea, button {
+      width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 10px; font-size:13px; font-family:inherit; background:#fff;
+    }
+    textarea { resize:none; line-height:1.55; }
+    .actions { display:grid; grid-template-columns:1.5fr 1fr 1fr; gap:8px; margin-top:10px; }
+    button { border:0; background:linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%); color:#fff; font-weight:700; }
+    button.ghost { background:#e7edfc; color:#1f3f89; border:1px solid #d0daf4; }
+    .status { margin-top:10px; font-size:12px; padding:9px 10px; border-radius:10px; background:#eef2ff; color:#213f83; border:1px solid #dce4ff; }
+  </style>
+</head>
+<body>
+  <main class="popup">
+    <h1>Polite Rewriter</h1>
+    <p class="sub">Google 로그인 후 일일 무료 5회(계정/IP 기준) 사용 가능한 버전입니다.</p>
+
+    <label>분위기</label>
+    <select><option selected>친근하게</option></select>
+
+    <label>보내는 대상</label>
+    <select><option selected>상사</option></select>
+
+    <label>본인 역할</label>
+    <input value="말단 직원" />
+
+    <label>원본 문자</label>
+    <textarea rows="8">야 ㅋㅋㅋㅋ 오늘은 또 뭘 먹냐 
+김치찌개 먹자하면 어제 먹었다 그러고 
+쌀국수 먹자하면 배 안찬다 그러고 그러면 가서 스프링롤같은걸 시키든가 
+짱개는 더부룩해서 싫다 그러고 나보고 뭘 고르라는거야 점심 부터 회랑 고기를 먹을수도 없고 진짜 빢치네ㅔㅔ</textarea>
+
+    <div class="actions">
+      <button>정중하게 다듬기</button>
+      <button class="ghost">초기화</button>
+      <button class="ghost">복사</button>
+    </div>
+
+    <label>변환 문자</label>
+    <textarea rows="7">오늘 점심은 뭘 먹을지 잘 모르겠네요. 김치찌개는 어제 드셔서 그렇고, 쌀국수는 양이 부족하다고 하시니 고민이 됩니다. 스프링롤 같은 가벼운 메뉴도 괜찮을 것 같은데 어떠신가요? 회나 고기는 점심으로는 좀 무거울 것 같고요. 의견 주시면 감사하겠습니다!</textarea>
+
+    <p class="status">완료 | 일일 무료 4/5회 남음 (계정 1/5 · IP 1/5)</p>
+  </main>
+</body>
+</html>

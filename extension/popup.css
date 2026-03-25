@@ -18,7 +18,7 @@
 
 body {
   margin: 0;
-  width: 390px;
+  width: 420px;
   background:
     radial-gradient(circle at 0% 0%, #d9e5ff 0%, transparent 38%),
     radial-gradient(circle at 100% 100%, #ecf2ff 0%, transparent 48%),
@@ -189,6 +189,12 @@ textarea {
   display: flex;
   gap: 8px;
   margin-top: 10px;
+}
+
+.compose-actions {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 8px;
 }
 
 .actions.secondary {

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Polite Message Rewriter - Capture Flow</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --card: #ffffff;
+      --line: #d8deec;
+      --text: #1b2333;
+      --muted: #61708a;
+      --primary: #234ea5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Pretendard", "Noto Sans KR", sans-serif;
+      background: radial-gradient(circle at top left, #d8e6ff, transparent 42%), var(--bg);
+      color: var(--text);
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    .sub { margin: 0 0 18px; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card);
+      padding: 14px;
+      box-shadow: 0 18px 40px -28px rgba(16, 28, 55, 0.35);
+    }
+    .step { font-size: 12px; color: var(--primary); font-weight: 700; }
+    .title { margin: 6px 0 10px; font-size: 16px; font-weight: 800; }
+    .frame {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #f9fbff;
+      min-height: 320px;
+    }
+    .line { font-size: 13px; margin: 0 0 7px; color: #2d3f66; }
+    .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #e9efff; color: #21489a; font-weight: 700; font-size: 12px; }
+    .pill { display: inline-block; margin-top: 8px; font-size: 12px; color: #285f38; background: #e7f8ed; border: 1px solid #c7e8d1; border-radius: 999px; padding: 5px 9px; }
+    .box {
+      margin-top: 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .result { background: #eef5ff; border-color: #cfdcf6; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Polite Message Rewriter - 로그인부터 결과까지</h1>
+    <p class="sub">LinkedIn 공유용 전체 흐름 캡처 (Google OAuth 로그인 + 문장 변환 완료)</p>
+
+    <section class="grid">
+      <article class="panel">
+        <div class="step">STEP 1</div>
+        <div class="title">확장 프로그램 팝업 열기</div>
+        <div class="frame">
+          <p class="line"><span class="badge">Polite Rewriter</span></p>
+          <p class="line">Google 로그인 후 일일 무료 5회(계정/IP 기준) 사용 가능한 버전입니다.</p>
+          <p class="line">계정: Google 계정으로 로그인하면 Free 일일 5회(계정/IP 각각 제한)로 시작합니다.</p>
+          <p class="line">요금제: Free 일일 제한: 계정 5회 + IP 5회 / PRO / Business / 10회 추가는 준비중</p>
+          <p class="pill">Google로 시작 버튼 클릭</p>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="step">STEP 2</div>
+        <div class="title">Google OAuth 로그인 완료</div>
+        <div class="frame">
+          <p class="line">Google 로그인 창에서 계정 선택 후 권한 동의</p>
+          <p class="line">서버 콜백: /api/auth/google/callback</p>
+          <p class="line">폴링 확인: /api/auth/google/poll</p>
+          <p class="pill">로그인 완료 | 일일 무료 5/5회 남음 (계정 0/5 · IP 0/5)</p>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="step">STEP 3</div>
+        <div class="title">입력값 설정 후 원본문자 입력</div>
+        <div class="frame">
+          <p class="line">분위기: 친근하게</p>
+          <p class="line">보내는 대상: 상사</p>
+          <p class="line">본인 역할: 말단 직원</p>
+          <div class="box">야 ㅋㅋㅋㅋ 오늘은 또 뭘 먹냐 
+김치찌개 먹자하면 어제 먹었다 그러고 
+쌀국수 먹자하면 배 안찬다 그러고 그러면 가서 스프링롤같은걸 시키든가 
+짱개는 더부룩해서 싫다 그러고 나보고 뭘 고르라는거야 점심 부터 회랑 고기를 먹을수도 없고 진짜 빢치네ㅔㅔ</div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="step">STEP 4</div>
+        <div class="title">정중하게 다듬기 결과</div>
+        <div class="frame">
+          <div class="box result">오늘 점심은 뭘 먹을지 잘 모르겠네요. 김치찌개는 어제 드셔서 그렇고, 쌀국수는 양이 부족하다고 하시니 고민이 됩니다. 스프링롤 같은 가벼운 메뉴도 괜찮을 것 같은데 어떠신가요? 회나 고기는 점심으로는 좀 무거울 것 같고요. 의견 주시면 감사하겠습니다!</div>
+          <p class="pill">완료 | 일일 무료 4/5회 남음 (계정 1/5 · IP 1/5)</p>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

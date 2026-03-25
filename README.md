@@ -55,8 +55,13 @@ npm run dev
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REDIRECT_URI`
+- `ALLOWED_ORIGINS` (운영 도메인/확장 ID 명시 권장)
+- `IP_QUOTA_SALT`
 - `TOSS_CLIENT_KEY`
 - `TOSS_SECRET_KEY`
+
+## 운영 트러블슈팅 기록
+- OAuth/배포/헤더 이슈 기록: `docs/oauth-and-extension-troubleshooting-ko.md`
 
 ## 주요 화면
 - Google 로그인
@@ -70,4 +75,4 @@ npm run dev
 - 민감한 법률/계약/분쟁 문장은 직접 최종 확인이 필요합니다.
 
 ## Last Updated
-- 2026-03-23
+- 2026-03-26

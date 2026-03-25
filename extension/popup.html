@@ -45,11 +45,15 @@
       <section class="card">
         <label for="tone">분위기</label>
         <select id="tone">
+          <option>보통</option>
           <option>친근하게</option>
           <option selected>정중하게</option>
           <option>아주 정중하게</option>
           <option>캐주얼하게</option>
           <option>공손하지만 단호하게</option>
+          <option>미안함</option>
+          <option>제안함</option>
+          <option>사랑함</option>
         </select>
 
         <label for="recipient">보내는 대상</label>
@@ -72,8 +76,9 @@
         <textarea id="originalText" rows="6" placeholder="정중하게 바꾸고 싶은 원본 문장을 입력하세요"></textarea>
         <p id="originalTextError" class="field-error"></p>
 
-        <div class="actions">
+        <div class="actions compose-actions">
           <button id="rewriteBtn" type="button">정중하게 다듬기</button>
+          <button id="resetBtn" type="button" class="ghost">초기화</button>
           <button id="copyBtn" type="button" class="ghost">복사</button>
         </div>
 

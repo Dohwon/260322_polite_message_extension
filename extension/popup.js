@@ -7,7 +7,9 @@ const STORAGE_KEYS = {
   pendingGoogleStartedAt: "pendingGoogleStartedAt",
   tone: "tone",
   recipient: "recipient",
-  senderRole: "senderRole"
+  senderRole: "senderRole",
+  draftOriginalText: "draftOriginalText",
+  draftRewrittenText: "draftRewrittenText"
 };
 
 const els = {
@@ -24,6 +26,7 @@ const els = {
   originalTextError: document.getElementById("originalTextError"),
   rewrittenText: document.getElementById("rewrittenText"),
   rewriteBtn: document.getElementById("rewriteBtn"),
+  resetBtn: document.getElementById("resetBtn"),
   copyBtn: document.getElementById("copyBtn"),
   proBtn: document.getElementById("proBtn"),
   businessBtn: document.getElementById("businessBtn"),
@@ -172,6 +175,13 @@ async function saveLocalState() {
   }
 }
 
+async function saveDraftTexts() {
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.draftOriginalText]: els.originalText?.value || "",
+    [STORAGE_KEYS.draftRewrittenText]: els.rewrittenText?.value || ""
+  });
+}
+
 async function loadLocalState() {
   const sync = await chrome.storage.sync.get([
     STORAGE_KEYS.tone,
@@ -182,12 +192,16 @@ async function loadLocalState() {
   const local = await chrome.storage.local.get([
     STORAGE_KEYS.sessionToken,
     STORAGE_KEYS.pendingGoogleDeviceId,
-    STORAGE_KEYS.pendingGoogleStartedAt
+    STORAGE_KEYS.pendingGoogleStartedAt,
+    STORAGE_KEYS.draftOriginalText,
+    STORAGE_KEYS.draftRewrittenText
   ]);
 
   if (els.tone) els.tone.value = sync[STORAGE_KEYS.tone] || "정중하게";
   if (els.recipient) els.recipient.value = sync[STORAGE_KEYS.recipient] || "기타";
   if (els.senderRole) els.senderRole.value = sync[STORAGE_KEYS.senderRole] || "";
+  if (els.originalText) els.originalText.value = local[STORAGE_KEYS.draftOriginalText] || "";
+  if (els.rewrittenText) els.rewrittenText.value = local[STORAGE_KEYS.draftRewrittenText] || "";
 
   state.sessionToken = local[STORAGE_KEYS.sessionToken] || "";
   return {
@@ -409,6 +423,7 @@ async function rewrite() {
     if (els.rewrittenText) {
       els.rewrittenText.value = json.rewrittenText || "";
     }
+    await saveDraftTexts();
 
     await refreshSession();
     setStatus(`완료 | ${usageText(state.user)}`, "success");
@@ -417,6 +432,14 @@ async function rewrite() {
   } finally {
     if (els.rewriteBtn) els.rewriteBtn.disabled = false;
   }
+}
+
+async function resetDraft() {
+  if (els.originalText) els.originalText.value = "";
+  if (els.rewrittenText) els.rewrittenText.value = "";
+  setFieldError(els.originalText, els.originalTextError, "");
+  await chrome.storage.local.remove([STORAGE_KEYS.draftOriginalText, STORAGE_KEYS.draftRewrittenText]);
+  setStatus("입력/결과를 초기화했습니다.", "success");
 }
 
 async function copyResult() {
@@ -453,9 +476,13 @@ function safeBind(element, eventName, handler, elementName) {
 }
 
 safeBind(els.originalText, "input", validateOriginalText, "originalText");
+safeBind(els.originalText, "input", () => {
+  saveDraftTexts().catch(() => {});
+}, "originalTextPersist");
 safeBind(els.googleLoginBtn, "click", loginWithGoogle, "googleLoginBtn");
 safeBind(els.logoutBtn, "click", logout, "logoutBtn");
 safeBind(els.rewriteBtn, "click", rewrite, "rewriteBtn");
+safeBind(els.resetBtn, "click", resetDraft, "resetBtn");
 safeBind(els.copyBtn, "click", copyResult, "copyBtn");
 safeBind(els.plansInfoBtn, "click", () => goPlans(""), "plansInfoBtn");
 safeBind(els.proBtn, "click", () => goPlans("pro"), "proBtn");

@@ -50,6 +50,12 @@ const plansLandingPath = path.join(__dirname, "plans-landing.html");
 const oauthPendingStates = new Map();
 const oauthDeviceResults = new Map();
 const FREE_DAILY_LIMIT = 5;
+const unlimitedBypassEmailSet = new Set(
+  String(env.unlimitedBypassEmails || "")
+    .split(",")
+    .map((v) => v.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 function extractResponseText(response) {
   if (typeof response?.output_text === "string" && response.output_text.trim()) {
@@ -94,6 +100,11 @@ function createSession(userId, rememberMe) {
 
 function createNonce(prefix) {
   return `${prefix}_${crypto.randomBytes(24).toString("hex")}`;
+}
+
+function isUnlimitedBypassUser(user) {
+  const email = String(user?.email || "").trim().toLowerCase();
+  return Boolean(email) && unlimitedBypassEmailSet.has(email);
 }
 
 function requestBaseUrl(req) {
@@ -158,9 +169,12 @@ function renderSimplePage(title, body) {
 
 function usageSummary(user, monthly, freeDailyUsedAccount = 0, freeDailyUsedIp = 0) {
   const plan = pickPlan(user.plan_id);
+  const isUnlimited = isUnlimitedBypassUser(user);
   const safeDailyUsedAccount = Number(freeDailyUsedAccount || 0);
   const safeDailyUsedIp = Number(freeDailyUsedIp || 0);
-  const freeDailyRemaining = Math.max(0, FREE_DAILY_LIMIT - safeDailyUsedAccount);
+  const freeDailyRemaining = isUnlimited
+    ? FREE_DAILY_LIMIT
+    : Math.max(0, FREE_DAILY_LIMIT - safeDailyUsedAccount);
   return {
     planId: user.plan_id,
     planName: plan.name,
@@ -182,12 +196,14 @@ function usageSummary(user, monthly, freeDailyUsedAccount = 0, freeDailyUsedIp =
       freeDailyLimit: FREE_DAILY_LIMIT,
       freeDailyUsedAccount: safeDailyUsedAccount,
       freeDailyUsedIp: safeDailyUsedIp,
+      isUnlimited,
       bonusRequestsRemaining: user.bonus_requests_remaining ?? 0
     },
     member: {
       isRegistered: Boolean(user.id),
       authProvider: user.auth_provider || null,
-      hasGoogleAuth: Boolean(user.google_sub)
+      hasGoogleAuth: Boolean(user.google_sub),
+      isUnlimited
     }
   };
 }
@@ -641,6 +657,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   }
 
   const user = req.user;
+  const isUnlimited = isUnlimitedBypassUser(user);
   const plan = pickPlan(user.plan_id);
   const monthly = getCurrentMonthlyUsage(user.id);
   const ipHash = getRequestIpHash(req);
@@ -661,7 +678,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   }
 
   const hasBonus = Number(user.bonus_requests_remaining || 0) > 0;
-  if (user.plan_id === "free") {
+  if (!isUnlimited && user.plan_id === "free") {
     const freeDaily = getFreeDailyUsage(user.id);
     const accountUsedCount = Number(freeDaily?.used_count || 0);
     const ipDaily = ipHash ? getFreeIpDailyUsage(ipHash) : null;
@@ -676,7 +693,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
         error: `오늘 현재 네트워크(IP)의 무료 사용 ${FREE_DAILY_LIMIT}회를 모두 사용했습니다. 내일 다시 초기화됩니다.`
       });
     }
-  } else {
+  } else if (!isUnlimited) {
     const hasRequestLimit = Number.isFinite(plan.maxMonthlyRequests);
     const requestLimitExceeded = hasRequestLimit && monthly.request_count >= plan.maxMonthlyRequests;
     const hasInputTokenLimit = Number.isFinite(plan.maxMonthlyInputTokens);
@@ -734,7 +751,9 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
     }
 
     const updated = addUsage(user.id, inputTokens, outputTokens);
-    if (hasBonus) {
+    if (isUnlimited) {
+      // unlimited bypass account: usage metrics are recorded, quota is not consumed
+    } else if (hasBonus) {
       consumeBonusRequest(user.id);
     } else if (user.plan_id === "free") {
       const consumedAccount = consumeFreeDailyUsage(user.id, FREE_DAILY_LIMIT);

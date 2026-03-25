@@ -13,6 +13,8 @@ export const env = {
   openaiChatFallbackModel: process.env.OPENAI_CHAT_FALLBACK_MODEL || "",
   openaiTimeoutMs: Number(process.env.OPENAI_TIMEOUT_MS || 20000),
   ipQuotaSalt: process.env.IP_QUOTA_SALT || "local-dev-ip-quota-salt-change-me",
+  unlimitedBypassEmails:
+    process.env.UNLIMITED_BYPASS_EMAILS || "dowonkim0612@gmail.com",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
@@ -64,6 +66,16 @@ export const PLANS = {
   }
 };
 
-export const TONES = ["친근하게", "정중하게", "아주 정중하게", "캐주얼하게", "공손하지만 단호하게"];
+export const TONES = [
+  "보통",
+  "친근하게",
+  "정중하게",
+  "아주 정중하게",
+  "캐주얼하게",
+  "공손하지만 단호하게",
+  "미안함",
+  "제안함",
+  "사랑함"
+];
 
 export const RECIPIENTS = ["상사", "동료", "친구", "학부모", "고객", "거래처", "연인", "가족", "기타"];
