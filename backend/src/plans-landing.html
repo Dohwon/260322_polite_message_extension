@@ -1,324 +1,198 @@
 <!doctype html>
 <html lang="ko">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Polite Message Rewriter 요금제</title>
-    <style>
-      :root {
-        --bg: #f5f7fb;
-        --panel: rgba(255, 255, 255, 0.94);
-        --line: #d7deef;
-        --text: #172033;
-        --muted: #5d6883;
-        --primary: #1342a7;
-        --primary-2: #0f327e;
-        --soft: #e8efff;
-        --ok: #1f6b35;
-        --warn: #8a5d00;
-        --danger: #9a1f1f;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: Pretendard, "Noto Sans KR", sans-serif;
-        color: var(--text);
-        background:
-          radial-gradient(circle at top left, #d9e7ff 0%, transparent 32%),
-          radial-gradient(circle at bottom right, #edf3ff 0%, transparent 38%),
-          var(--bg);
-      }
-      .shell { max-width: 1120px; margin: 0 auto; padding: 32px 20px 88px; }
-      .hero { padding: 40px 0 18px; }
-      .eyebrow {
-        display: inline-block;
-        padding: 6px 12px;
-        border-radius: 999px;
-        background: var(--soft);
-        color: var(--primary);
-        font-size: 12px;
-        font-weight: 700;
-      }
-      h1 { margin: 18px 0 12px; font-size: clamp(32px, 6vw, 56px); line-height: 1.02; letter-spacing: -0.04em; }
-      .lead { margin: 0; max-width: 780px; color: var(--muted); font-size: 18px; line-height: 1.65; }
-      .notice { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; }
-      .chip {
-        padding: 10px 14px;
-        border-radius: 999px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        font-size: 13px;
-      }
-      .block { margin-top: 26px; border: 1px solid var(--line); border-radius: 20px; padding: 20px; background: var(--panel); }
-      .status { margin-top: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: #f2f5ff; font-size: 14px; }
-      .status.error { border-color: #f0c0c0; background: #fff1f1; color: var(--danger); }
-      .status.success { border-color: #bfe2cb; background: #ecf9f1; color: var(--ok); }
-      h2 { margin: 0 0 10px; font-size: 23px; }
-      .muted { color: var(--muted); line-height: 1.65; margin: 0; }
-      .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
-      .full { grid-column: 1 / -1; }
-      input, textarea, button {
-        width: 100%;
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        font: inherit;
-        padding: 11px 12px;
-        background: #fff;
-      }
-      textarea { resize: vertical; min-height: 120px; }
-      button {
-        border: 0;
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
-        color: #fff;
-        font-weight: 700;
-        cursor: pointer;
-      }
-      button.secondary { background: #edf2ff; color: var(--primary); border: 1px solid #d0dbf5; }
-      button:disabled { opacity: 0.55; cursor: not-allowed; }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Polite Message Rewriter 요금제</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root { --bg:#f7f9fb; --line:#d7dbe7; --text:#191c1e; --muted:#57657a; --primary:#093471; --primary2:#294c8a; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:"Inter","Noto Sans KR",sans-serif; }
+    .hero { padding: 100px 20px 60px; text-align:center; background: linear-gradient(180deg,#f7f9fb 0%,#eceef0 100%); }
+    .hero .tag { display:inline-block; padding:6px 12px; border-radius:999px; background:#dce7ff; color:#214a98; font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+    .hero h1 { margin:18px 0 12px; font-family:"Manrope",sans-serif; font-size: clamp(34px,5vw,56px); font-weight:800; color:var(--primary); letter-spacing:-.03em; }
+    .hero p { margin:0; color:var(--muted); font-size:clamp(16px,2.2vw,22px); line-height:1.65; }
+    .section { max-width:1100px; margin:0 auto; padding:58px 20px; }
+    .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
+    .card { border:1px solid var(--line); border-radius:18px; background:#fff; padding:26px; box-shadow:0 20px 46px -30px rgba(20,30,50,.35); }
+    .card h3 { margin:0 0 6px; font-family:"Manrope",sans-serif; font-size:28px; }
+    .sub { color:var(--muted); font-size:14px; }
+    .price { margin:20px 0; font-family:"Manrope",sans-serif; font-size:48px; font-weight:800; color:var(--primary); }
+    .price span { font-family:"Inter",sans-serif; font-size:20px; font-weight:700; color:var(--muted); }
+    .list p { margin:9px 0; font-size:14px; }
+    .btn { width:100%; border:0; border-radius:10px; padding:14px; font-weight:800; cursor:pointer; }
+    .btn-main { background:linear-gradient(135deg,var(--primary),var(--primary2)); color:#fff; }
+    .btn-sub { background:#edf2ff; color:#1f3f89; border:1px solid #d0daf4; }
+    .note { margin-top:18px; text-align:center; color:var(--muted); font-size:13px; }
+    .table-wrap { border:1px solid var(--line); border-radius:16px; overflow:hidden; background:#fff; box-shadow:0 20px 46px -30px rgba(20,30,50,.35); }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:16px 18px; border-bottom:1px solid #e7ebf4; text-align:left; }
+    thead th { background:var(--primary); color:#fff; font-family:"Manrope",sans-serif; }
+    .contact { border:1px solid var(--line); border-radius:16px; background:#fff; padding:22px; box-shadow:0 20px 46px -30px rgba(20,30,50,.35); }
+    .contact h3 { margin:0 0 8px; font-family:"Manrope",sans-serif; font-size:28px; }
+    .contact p { margin:0 0 14px; color:var(--muted); font-size:14px; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    input, select, textarea { width:100%; border:1px solid var(--line); border-radius:10px; padding:11px 12px; font:inherit; }
+    textarea { min-height:130px; resize:vertical; grid-column:1 / -1; }
+    .form-grid button { grid-column:1 / -1; }
+    footer { margin-top:40px; border-top:1px solid #e5e9f2; background:#f1f4fa; }
+    .footer-inner { max-width:1100px; margin:0 auto; padding:24px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .links { display:flex; gap:16px; flex-wrap:wrap; }
+    .links a { color:#4f5f79; text-decoration:none; font-size:13px; }
+    @media (max-width:900px) { .cards { grid-template-columns:1fr; } .form-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <section class="hero">
+    <span class="tag">Subscription Plans</span>
+    <h1>충전형, 구독형 Pro / Business 요금제 비교</h1>
+    <p>당신의 전문성을 더하는 정중한 메시지 작성.<br />사용량에 딱 맞는 합리적인 플랜을 선택하세요.</p>
+  </section>
 
-      .pricing { margin-top: 42px; }
-      .pricing-head { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin-bottom: 12px; }
-      .pricing-head p { margin:0; color: var(--muted); }
-      .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-      .card {
-        position: relative;
-        border: 1px solid var(--line);
-        border-radius: 22px;
-        padding: 22px;
-        background: var(--panel);
-        box-shadow: 0 24px 56px -38px rgba(25, 42, 76, 0.34);
-      }
-      .card.featured { border: 2px solid rgba(19, 66, 167, 0.2); transform: translateY(-8px); }
-      .badge {
-        position: absolute;
-        top: 16px;
-        right: 16px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: #162e63;
-        color: #fff;
-        font-size: 11px;
-        font-weight: 700;
-      }
-      .plan-name { font-size: 21px; font-weight: 800; }
-      .plan-desc { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
-      .price { display:flex; align-items:end; gap:8px; margin: 24px 0 10px; }
-      .price strong { font-size: 42px; line-height: 1; letter-spacing: -0.04em; }
-      .price span { color: var(--muted); font-size: 15px; }
-      .subline { color: var(--muted); font-size: 13px; min-height: 20px; }
-      ul { margin: 18px 0 0; padding: 0; list-style: none; }
-      li { margin-top: 10px; padding-left: 18px; position: relative; font-size: 14px; line-height: 1.55; }
-      li::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 9px;
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: var(--primary);
-      }
-
-      .footer-links { margin-top: 18px; display:flex; flex-wrap:wrap; gap:12px; }
-      .footer-links a { color: var(--primary); text-decoration: none; font-size: 13px; }
-      .footer-links a:hover { text-decoration: underline; }
-
-      @media (max-width: 960px) {
-        .grid { grid-template-columns: 1fr; }
-        .card.featured { transform: none; }
-        .fields { grid-template-columns: 1fr; }
-      }
-    </style>
-  </head>
-  <body>
-    <main class="shell">
-      <section class="hero">
-        <span class="eyebrow">Google 로그인 전용 요금제</span>
-        <h1>문장 품질은 유지하고,<br />사용량은 명확하게 관리합니다</h1>
-        <p class="lead">
-          회원가입은 Google OAuth로만 지원합니다. 익스텐션에서 로그인한 사용자 기준으로 무료 체험, 토큰/요청량,
-          결제 이력이 백엔드에서 관리됩니다.
-        </p>
-        <div class="notice">
-          <div class="chip">Free: 총 5회 + 월 토큰 100</div>
-          <div class="chip">Pro Monthly: 월 50회 / 1회 4,000자</div>
-          <div class="chip">Pro Annual: 매달 100회 / 1회 4,000자</div>
+  <section class="section">
+    <div class="cards">
+      <article class="card">
+        <h3>Pro Plan</h3>
+        <div class="sub">개인 사용자를 위한 표준 플랜</div>
+        <div class="price">6,900 <span>원/월</span></div>
+        <div class="list">
+          <p>월 요청 900회</p>
+          <p>입력 토큰 600,000t</p>
+          <p>출력 토큰 360,000t</p>
+          <p>1회 최대 글자 3,200자</p>
         </div>
-        <div id="memberStatus" class="status"><strong>로그인 상태 확인 중...</strong></div>
-      </section>
+        <button id="buyProBtn" class="btn btn-sub" type="button">플랜 선택하기</button>
+      </article>
 
-      <section class="block">
-        <h2>고객 문의 게시판</h2>
-        <p class="muted">개선 요청/버그 제보/제휴 문의를 남겨 주세요. 작성된 내용은 운영자 전용 관리자 화면에서만 확인됩니다.</p>
-        <form id="feedbackForm" class="fields">
-          <input id="feedbackEmail" type="email" placeholder="답변 받을 이메일" required />
-          <input id="feedbackTopic" type="text" placeholder="문의 주제" required />
-          <textarea id="feedbackMessage" class="full" placeholder="문의 내용" required></textarea>
-          <button id="feedbackSubmitBtn" type="submit" class="full">문의 남기기</button>
-        </form>
-        <div id="feedbackStatus" class="status" style="display:none"></div>
-      </section>
-
-      <section class="block">
-        <h2>정책 요약</h2>
-        <p class="muted">Chrome 확장에는 OpenAI 키나 결제 시크릿을 저장하지 않습니다. 실제 변환/한도 판정/결제 처리/회원 상태 관리는 전부 서버에서 실행됩니다.</p>
-        <p class="muted">Google 로그인 창이 열리지 않으면 운영자에게 `GOOGLE_REDIRECT_URI`와 `APP_BASE_URL` 설정 상태를 확인 요청해 주세요.</p>
-        <div class="footer-links">
-          <a href="/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>
-          <a href="/legal/terms" target="_blank" rel="noreferrer">Terms of Service</a>
-          <a href="/legal/contact" target="_blank" rel="noreferrer">Contact Us</a>
-          <a href="/legal/cookies" target="_blank" rel="noreferrer">Cookie Settings</a>
+      <article class="card">
+        <h3>Business Plan</h3>
+        <div class="sub">팀과 기업을 위한 고용량 플랜</div>
+        <div class="price">19,900 <span>원/월</span></div>
+        <div class="list">
+          <p>월 요청 4,000회</p>
+          <p>입력 토큰 2,800,000t</p>
+          <p>출력 토큰 1,600,000t</p>
+          <p>1회 최대 글자 5,000자</p>
+          <p>우선 순위 고객 지원</p>
         </div>
-      </section>
+        <button id="buyBusinessBtn" class="btn btn-main" type="button">비즈니스 시작하기</button>
+      </article>
+    </div>
+    <p class="note">결제 기능은 순차적으로 오픈되고 있습니다</p>
+  </section>
 
-      <section class="pricing">
-        <div class="pricing-head">
-          <h2>요금제</h2>
-          <p>요금제 섹션은 페이지 최하단에 배치했습니다.</p>
-        </div>
-        <div class="grid">
-          <article class="card">
-            <div class="plan-name">Free</div>
-            <p class="plan-desc">처음 써보는 사용자를 위한 체험 플랜</p>
-            <div class="price"><strong>0원</strong><span>/ 체험</span></div>
-            <div class="subline">총 5회 + 월 토큰 100</div>
-            <ul>
-              <li>총 5회 사용 가능</li>
-              <li>월 입력/출력 토큰 각 100 한도</li>
-              <li>기본 톤 변환 기능 제공</li>
-              <li>Google 로그인 사용자 기준 관리</li>
-            </ul>
-            <button type="button" class="secondary" disabled>현재 체험 플랜</button>
-          </article>
+  <section class="section">
+    <h2 style="font-family:Manrope,sans-serif;font-size:32px;margin:0 0 14px">상세 기능 비교</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>항목</th><th>Pro Plan</th><th>Business Plan</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>월 요금</td><td>6,900원</td><td>19,900원</td></tr>
+          <tr><td>월 요청 수</td><td>900회</td><td>4,000회</td></tr>
+          <tr><td>입력 토큰</td><td>600,000t</td><td>2,800,000t</td></tr>
+          <tr><td>출력 토큰</td><td>360,000t</td><td>1,600,000t</td></tr>
+          <tr><td>1회 최대 글자</td><td>3,200자</td><td>5,000자</td></tr>
+          <tr><td>추가 충전 서비스</td><td colspan="2">10회 / 1,000원</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-          <article class="card featured">
-            <div class="badge">추천</div>
-            <div class="plan-name">Pro Monthly</div>
-            <p class="plan-desc">개인 사용자를 위한 월간 플랜</p>
-            <div class="price"><strong>4,900원</strong><span>/ 월</span></div>
-            <div class="subline">월 50회, 1회 최대 4,000자</div>
-            <ul>
-              <li>매달 50회 사용</li>
-              <li>1회 최대 4,000자</li>
-              <li>서버 기반 사용량 집계</li>
-              <li>Google 계정 기준 플랜 유지</li>
-            </ul>
-            <button id="buyMonthlyBtn" type="button">신청폼 작성</button>
-          </article>
+  <section class="section" style="padding-top:0">
+    <div class="contact">
+      <h3>고객 문의 게시판</h3>
+      <p>비회원도 문의를 보낼 수 있습니다. 전송 성공 시 팝업 안내 후 입력 내용이 초기화됩니다.</p>
+      <form id="feedbackForm" class="form-grid">
+        <input id="feedbackEmail" type="email" placeholder="답변 받을 이메일" required />
+        <select id="feedbackTopic" required>
+          <option value="" selected disabled>문의 주제를 선택해 주세요</option>
+          <option value="메시지 생성 문의">1) 메시지 생성 문의</option>
+          <option value="추가 유형 문의">2) 추가 유형 문의</option>
+          <option value="로그인 문의">3) 로그인 문의</option>
+          <option value="충전 문의">4) 충전 문의</option>
+          <option value="기타 문의">5) 기타 문의</option>
+        </select>
+        <textarea id="feedbackMessage" placeholder="문의 내용을 입력해 주세요" required></textarea>
+        <button id="feedbackSubmitBtn" class="btn btn-main" type="submit">문의 남기기</button>
+      </form>
+    </div>
+  </section>
 
-          <article class="card">
-            <div class="plan-name">Pro Annual</div>
-            <p class="plan-desc">반복 사용이 많은 사용자를 위한 연간 플랜</p>
-            <div class="price"><strong>39,000원</strong><span>/ 년</span></div>
-            <div class="subline">매달 100회, 1회 최대 4,000자</div>
-            <ul>
-              <li>매달 100회 사용</li>
-              <li>1회 최대 4,000자</li>
-              <li>장기 사용량에 적합</li>
-              <li>동일 Google 계정으로 연동</li>
-            </ul>
-            <button id="buyAnnualBtn" type="button" class="secondary">송금/문의 안내</button>
-          </article>
-        </div>
-      </section>
-    </main>
+  <footer>
+    <div class="footer-inner">
+      <strong style="font-family:Manrope,sans-serif">Polite Message Rewriter</strong>
+      <div class="links">
+        <a href="/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>
+        <a href="/legal/terms" target="_blank" rel="noreferrer">Terms of Service</a>
+        <a href="/legal/contact" target="_blank" rel="noreferrer">Contact Us</a>
+        <a href="/legal/cookies" target="_blank" rel="noreferrer">Cookie Settings</a>
+      </div>
+      <span style="font-size:12px;color:#5c6d87">© 2026 Polite Message Rewriter</span>
+    </div>
+  </footer>
 
-    <script>
-      const params = new URLSearchParams(window.location.search);
-      const target = params.get("target") || "";
-      const sessionToken = params.get("sessionToken") || "";
-      const apiBaseUrl = window.location.origin;
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get("target") || "";
+    const apiBaseUrl = window.location.origin;
+    const feedbackForm = document.getElementById("feedbackForm");
+    const feedbackSubmitBtn = document.getElementById("feedbackSubmitBtn");
+    const feedbackTopicEl = document.getElementById("feedbackTopic");
+    const feedbackMsgEl = document.getElementById("feedbackMessage");
 
-      const memberStatus = document.getElementById("memberStatus");
-      const buyMonthlyBtn = document.getElementById("buyMonthlyBtn");
-      const buyAnnualBtn = document.getElementById("buyAnnualBtn");
-      const feedbackForm = document.getElementById("feedbackForm");
-      const feedbackStatus = document.getElementById("feedbackStatus");
-      const feedbackSubmitBtn = document.getElementById("feedbackSubmitBtn");
-
-      function setMemberStatus(html, cls = "") {
-        memberStatus.className = `status ${cls}`.trim();
-        memberStatus.innerHTML = html;
+    function prefillByTarget(value) {
+      if (value === "pro" || value === "pro_monthly") {
+        feedbackTopicEl.value = "충전 문의";
+        feedbackMsgEl.value = "Pro 플랜 관련 문의입니다.\n";
       }
-
-      function setFeedbackStatus(message, cls = "") {
-        feedbackStatus.style.display = "block";
-        feedbackStatus.className = `status ${cls}`.trim();
-        feedbackStatus.textContent = message;
+      if (value === "business") {
+        feedbackTopicEl.value = "충전 문의";
+        feedbackMsgEl.value = "Business 플랜 관련 문의입니다.\n";
       }
-
-      async function fetchSession() {
-        if (!sessionToken) {
-          setMemberStatus("<strong>확장에서 연 페이지가 아닙니다.</strong><br />결제를 진행하려면 확장에서 Google 로그인을 먼저 완료하세요.", "error");
-          buyMonthlyBtn.disabled = true;
-          buyAnnualBtn.disabled = true;
-          return;
-        }
-
-        try {
-          const res = await fetch(`${apiBaseUrl}/api/auth/session`, { headers: { "x-session-token": sessionToken } });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || "세션 확인 실패");
-
-          setMemberStatus(`<strong>${json.email}</strong><br />${json.planName} · ${json.usage.requestCount || 0}회 사용`, "success");
-          buyMonthlyBtn.disabled = false;
-          buyAnnualBtn.disabled = false;
-        } catch (err) {
-          setMemberStatus(`<strong>로그인 상태를 확인할 수 없습니다.</strong><br />${String(err.message || err)}`, "error");
-          buyMonthlyBtn.disabled = true;
-          buyAnnualBtn.disabled = true;
-        }
+      if (value === "topup10") {
+        feedbackTopicEl.value = "충전 문의";
+        feedbackMsgEl.value = "10회 추가 충전 관련 문의입니다.\n";
       }
+    }
 
-      function openManualGuide(planId) {
-        const topicInput = document.getElementById("feedbackTopic");
-        const msgInput = document.getElementById("feedbackMessage");
-        if (planId === "pro_monthly") {
-          topicInput.value = "Pro Monthly 신청";
-          msgInput.value = "신청 이메일: \\n원하는 플랜: Pro Monthly\\n결제 방식: 계좌이체/토스송금\\n";
-        } else if (planId === "pro_annual") {
-          topicInput.value = "Pro Annual 신청";
-          msgInput.value = "신청 이메일: \\n원하는 플랜: Pro Annual\\n결제 방식: 계좌이체/토스송금\\n";
-        } else {
-          topicInput.value = "10회 충전 신청";
-          msgInput.value = "신청 이메일: \\n원하는 충전: 10회(1,000원)\\n결제 방식: 계좌이체/토스송금\\n";
-        }
-        feedbackForm.scrollIntoView({ behavior: "smooth", block: "start" });
-        setFeedbackStatus("아래 신청폼을 작성해 주세요. 확인 후 운영자가 계정별로 수동 충전/플랜 적용합니다.");
+    feedbackForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      feedbackSubmitBtn.disabled = true;
+      try {
+        const payload = {
+          email: document.getElementById("feedbackEmail").value.trim(),
+          topic: feedbackTopicEl.value.trim(),
+          message: feedbackMsgEl.value.trim()
+        };
+        const res = await fetch(apiBaseUrl + "/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "문의 접수 실패");
+        feedbackForm.reset();
+        alert("문의가 정상 전송되었습니다.");
+      } catch (err) {
+        alert(String(err.message || err));
+      } finally {
+        feedbackSubmitBtn.disabled = false;
       }
+    });
 
-      feedbackForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        feedbackSubmitBtn.disabled = true;
-        try {
-          const payload = {
-            email: document.getElementById("feedbackEmail").value.trim(),
-            topic: document.getElementById("feedbackTopic").value.trim(),
-            message: document.getElementById("feedbackMessage").value.trim()
-          };
-          const res = await fetch(`${apiBaseUrl}/api/feedback`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || "문의 접수 실패");
-          feedbackForm.reset();
-          setFeedbackStatus("문의가 접수되었습니다. 확인 후 답변드리겠습니다.", "success");
-        } catch (err) {
-          setFeedbackStatus(String(err.message || err), "error");
-        } finally {
-          feedbackSubmitBtn.disabled = false;
-        }
-      });
+    document.getElementById("buyProBtn").addEventListener("click", () => {
+      prefillByTarget("pro");
+      feedbackForm.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    document.getElementById("buyBusinessBtn").addEventListener("click", () => {
+      prefillByTarget("business");
+      feedbackForm.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
 
-      buyMonthlyBtn.addEventListener("click", () => openManualGuide("pro_monthly"));
-      buyAnnualBtn.addEventListener("click", () => openManualGuide("pro_annual"));
-
-      fetchSession().then(() => {
-        if (target === "pro_monthly") buyMonthlyBtn.focus();
-        if (target === "pro_annual") buyAnnualBtn.focus();
-      });
-    </script>
-  </body>
+    prefillByTarget(target);
+  </script>
+</body>
 </html>

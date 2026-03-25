@@ -184,6 +184,53 @@ function renderSimplePage(title, body) {
   </html>`;
 }
 
+async function notifyFeedbackByEmail({ email, topic, message }) {
+  if (!env.resendApiKey || !env.feedbackNotifyEmail) {
+    return { delivered: false, reason: "email_not_configured" };
+  }
+
+  const subject = `[Polite 문의] ${topic}`;
+  const text = [
+    "새 고객 문의가 접수되었습니다.",
+    "",
+    `회신 이메일: ${email}`,
+    `문의 주제: ${topic}`,
+    "",
+    "문의 내용:",
+    message
+  ].join("\n");
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.resendApiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: env.resendFromEmail,
+      to: [env.feedbackNotifyEmail],
+      reply_to: email,
+      subject,
+      text
+    })
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`feedback email delivery failed: ${res.status} ${errBody}`);
+  }
+
+  return { delivered: true };
+}
+
+const FEEDBACK_TOPICS = new Set([
+  "메시지 생성 문의",
+  "추가 유형 문의",
+  "로그인 문의",
+  "충전 문의",
+  "기타 문의"
+]);
+
 function usageSummary(user, monthly, freeDailyUsedAccount = 0, freeDailyUsedIp = 0) {
   const plan = pickPlan(user.plan_id);
   const isUnlimited = isUnlimitedBypassUser(user);
@@ -515,14 +562,26 @@ app.post("/api/feedback", async (req, res) => {
   if (!email || !email.includes("@")) {
     return res.status(400).json({ error: "유효한 이메일을 입력해 주세요." });
   }
-  if (!topic || topic.length < 2) {
-    return res.status(400).json({ error: "문의 주제를 입력해 주세요." });
+  if (!FEEDBACK_TOPICS.has(topic)) {
+    return res.status(400).json({ error: "문의 주제를 목록에서 선택해 주세요." });
   }
   if (!message || message.length < 6) {
     return res.status(400).json({ error: "문의 내용을 6자 이상 입력해 주세요." });
   }
   createFeedback({ email, topic, message });
-  return res.json({ ok: true });
+  try {
+    const mail = await notifyFeedbackByEmail({ email, topic, message });
+    if (!mail.delivered) {
+      return res.status(503).json({
+        error: "문의는 저장되었지만 이메일 전송 설정이 아직 완료되지 않았습니다."
+      });
+    }
+    return res.json({ ok: true, emailDelivered: mail.delivered });
+  } catch (err) {
+    return res.status(500).json({
+      error: "문의는 저장되었지만 이메일 전달에 실패했습니다. 잠시 후 다시 시도해 주세요."
+    });
+  }
 });
 
 app.get("/admin/feedback", (req, res) => {

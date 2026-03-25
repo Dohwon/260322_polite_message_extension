@@ -15,6 +15,9 @@ export const env = {
   ipQuotaSalt: process.env.IP_QUOTA_SALT || "local-dev-ip-quota-salt-change-me",
   unlimitedBypassEmails:
     process.env.UNLIMITED_BYPASS_EMAILS || "dowonkim0612@gmail.com",
+  feedbackNotifyEmail: process.env.FEEDBACK_NOTIFY_EMAIL || "dowonkim0612@gmail.com",
+  resendApiKey: process.env.RESEND_API_KEY || "",
+  resendFromEmail: process.env.RESEND_FROM_EMAIL || "Polite Message <onboarding@resend.dev>",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",

@@ -38,7 +38,8 @@ const state = {
   apiBaseUrl: DEFAULT_API_BASE_URL,
   sessionToken: "",
   user: null,
-  isPollingGoogleLogin: false
+  isPollingGoogleLogin: false,
+  autoReloginTriggered: false
 };
 
 function setStatus(message, variant = "info") {
@@ -123,7 +124,10 @@ function updateAuthUI() {
   const isLoggedIn = Boolean(state.user);
   const loginPending = state.isPollingGoogleLogin;
 
-  if (els.googleLoginBtn) els.googleLoginBtn.disabled = isLoggedIn || loginPending;
+  if (els.googleLoginBtn) {
+    els.googleLoginBtn.disabled = isLoggedIn || loginPending;
+    els.googleLoginBtn.classList.toggle("hidden", isLoggedIn);
+  }
   if (els.logoutBtn) {
     els.logoutBtn.disabled = !isLoggedIn;
     els.logoutBtn.classList.toggle("hidden", !isLoggedIn);
@@ -242,6 +246,7 @@ async function refreshSession() {
     }
 
     state.user = json;
+    state.autoReloginTriggered = false;
     updateAuthUI();
     setAuthStatus("Google 로그인 연결됨", "success");
     setStatus(`로그인됨 | ${usageText(json)}`, "success");
@@ -250,8 +255,19 @@ async function refreshSession() {
     state.sessionToken = "";
     await chrome.storage.local.remove([STORAGE_KEYS.sessionToken]);
     updateAuthUI();
+    const msg = String(err?.message || "");
+    const isSessionExpired = msg.includes("세션") || msg.includes("401");
+    if (!isSessionExpired) {
+      setAuthStatus("로그인 상태 확인 실패", "error");
+      setStatus(normalizeFetchError(err), "error");
+      return;
+    }
     setAuthStatus("세션이 만료되었습니다.", "error");
-    setStatus(normalizeFetchError(err), "error");
+    setStatus("세션 만료로 다시 로그인합니다. Google 창을 확인해 주세요.", "error");
+    if (!state.autoReloginTriggered) {
+      state.autoReloginTriggered = true;
+      loginWithGoogle().catch(() => {});
+    }
   }
 }
 
