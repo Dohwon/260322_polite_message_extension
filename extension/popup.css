@@ -63,30 +63,33 @@ h1 {
   margin-top: 10px;
 }
 
-.plans-card {
-  position: relative;
-}
-
-.plans-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+.account-row {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
-  padding: 12px;
-  text-align: center;
-  color: #102a61;
-  font-size: 12px;
-  font-weight: 700;
-  pointer-events: none;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
 }
 
-.plans-overlay strong {
-  font-size: 14px;
+.mini-chip {
+  min-height: 14px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #213f83;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mini-chip.error {
+  background: var(--error-bg);
+  color: #8f1a1a;
+}
+
+.mini-chip.success {
+  background: var(--ok-bg);
+  color: #21572f;
 }
 
 label {
@@ -201,6 +204,28 @@ textarea {
   margin-top: 0;
 }
 
+.inline-toggle {
+  margin-top: 6px;
+  background: #f4f7fd;
+  color: #28426f;
+  border: 1px solid #d8e0f3;
+}
+
+.background-wrap {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed #d4dbee;
+  border-radius: 12px;
+  background: rgba(244, 247, 253, 0.75);
+}
+
+.helper-text {
+  margin: 6px 2px 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 button {
   border: 0;
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
@@ -248,6 +273,24 @@ button.ghost:hover {
   background: var(--ok-bg);
   color: #21572f;
   border-color: #c6ead2;
+}
+
+.status.warning {
+  background: #fff1f2;
+  color: #a11b2b;
+  border-color: #fecdd3;
+  animation: softPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes softPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.08);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.12);
+    opacity: 0.9;
+  }
 }
 
 #logoutWrap {

@@ -4,107 +4,390 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Polite Message Rewriter 요금제</title>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    :root { --bg:#f7f9fb; --line:#d7dbe7; --text:#191c1e; --muted:#57657a; --primary:#093471; --primary2:#294c8a; }
+    :root {
+      --bg: #f7f9fb;
+      --panel: rgba(255, 255, 255, 0.92);
+      --line: #d7dbe7;
+      --text: #191c1e;
+      --muted: #57657a;
+      --primary: #093471;
+      --primary2: #294c8a;
+      --soft: #e7edfc;
+      --softText: #1f3f89;
+      --warn: #b42318;
+      --ok: #1f6f43;
+    }
     * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:var(--text); font-family:"Inter","Noto Sans KR",sans-serif; }
-    .hero { padding: 100px 20px 60px; text-align:center; background: linear-gradient(180deg,#f7f9fb 0%,#eceef0 100%); }
-    .hero .tag { display:inline-block; padding:6px 12px; border-radius:999px; background:#dce7ff; color:#214a98; font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
-    .hero h1 { margin:18px 0 12px; font-family:"Manrope",sans-serif; font-size: clamp(34px,5vw,56px); font-weight:800; color:var(--primary); letter-spacing:-.03em; }
-    .hero p { margin:0; color:var(--muted); font-size:clamp(16px,2.2vw,22px); line-height:1.65; }
-    .section { max-width:1100px; margin:0 auto; padding:58px 20px; }
-    .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
-    .card { border:1px solid var(--line); border-radius:18px; background:#fff; padding:26px; box-shadow:0 20px 46px -30px rgba(20,30,50,.35); }
-    .card h3 { margin:0 0 6px; font-family:"Manrope",sans-serif; font-size:28px; }
-    .sub { color:var(--muted); font-size:14px; }
-    .price { margin:20px 0; font-family:"Manrope",sans-serif; font-size:48px; font-weight:800; color:var(--primary); }
-    .price span { font-family:"Inter",sans-serif; font-size:20px; font-weight:700; color:var(--muted); }
-    .list p { margin:9px 0; font-size:14px; }
-    .btn { width:100%; border:0; border-radius:10px; padding:14px; font-weight:800; cursor:pointer; }
-    .btn-main { background:linear-gradient(135deg,var(--primary),var(--primary2)); color:#fff; }
-    .btn-sub { background:#edf2ff; color:#1f3f89; border:1px solid #d0daf4; }
-    .note { margin-top:18px; text-align:center; color:var(--muted); font-size:13px; }
-    .table-wrap { border:1px solid var(--line); border-radius:16px; overflow:hidden; background:#fff; box-shadow:0 20px 46px -30px rgba(20,30,50,.35); }
-    table { width:100%; border-collapse:collapse; }
-    th, td { padding:16px 18px; border-bottom:1px solid #e7ebf4; text-align:left; }
-    thead th { background:var(--primary); color:#fff; font-family:"Manrope",sans-serif; }
-    .contact { border:1px solid var(--line); border-radius:16px; background:#fff; padding:22px; box-shadow:0 20px 46px -30px rgba(20,30,50,.35); }
-    .contact h3 { margin:0 0 8px; font-family:"Manrope",sans-serif; font-size:28px; }
-    .contact p { margin:0 0 14px; color:var(--muted); font-size:14px; }
-    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    input, select, textarea { width:100%; border:1px solid var(--line); border-radius:10px; padding:11px 12px; font:inherit; }
-    textarea { min-height:130px; resize:vertical; grid-column:1 / -1; }
-    .form-grid button { grid-column:1 / -1; }
-    footer { margin-top:40px; border-top:1px solid #e5e9f2; background:#f1f4fa; }
-    .footer-inner { max-width:1100px; margin:0 auto; padding:24px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-    .links { display:flex; gap:16px; flex-wrap:wrap; }
-    .links a { color:#4f5f79; text-decoration:none; font-size:13px; }
-    @media (max-width:900px) { .cards { grid-template-columns:1fr; } .form-grid { grid-template-columns:1fr; } }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Inter", "Noto Sans KR", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(176, 202, 255, 0.55), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(214, 229, 255, 0.7), transparent 32%),
+        var(--bg);
+    }
+    .container { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .hero { padding: 88px 0 34px; text-align: center; }
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #dce7ff;
+      color: #214a98;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 18px 0 12px;
+      font-family: "Manrope", sans-serif;
+      font-size: clamp(36px, 6vw, 58px);
+      line-height: 1.04;
+      letter-spacing: -0.04em;
+      color: var(--primary);
+    }
+    .hero p {
+      margin: 0 auto;
+      max-width: 700px;
+      color: var(--muted);
+      font-size: clamp(16px, 2vw, 22px);
+      line-height: 1.7;
+    }
+    .session-bar {
+      display: none;
+      margin: 26px auto 0;
+      max-width: 760px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 22px 40px -34px rgba(15, 33, 67, 0.4);
+      text-align: left;
+    }
+    .session-bar.visible { display: block; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #eaf7ef;
+      color: var(--ok);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .chip::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+    .session-copy { margin-top: 10px; color: var(--muted); font-size: 14px; }
+    .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; padding-bottom: 18px; }
+    .card {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+      padding: 26px;
+      border: 1px solid rgba(215, 219, 231, 0.9);
+      border-radius: 24px;
+      background: var(--panel);
+      box-shadow: 0 28px 60px -42px rgba(16, 32, 67, 0.45);
+      backdrop-filter: blur(14px);
+    }
+    .card.featured {
+      border-color: rgba(41, 76, 138, 0.22);
+      box-shadow: 0 36px 80px -42px rgba(14, 44, 96, 0.28);
+    }
+    .card-kicker {
+      display: inline-flex;
+      width: fit-content;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: var(--softText);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .card h2 {
+      margin: 16px 0 8px;
+      font-family: "Manrope", sans-serif;
+      font-size: 30px;
+      letter-spacing: -0.03em;
+    }
+    .card .desc {
+      min-height: 44px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .price {
+      margin: 20px 0 18px;
+      font-family: "Manrope", sans-serif;
+      font-size: 50px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      color: var(--primary);
+    }
+    .price span {
+      margin-left: 4px;
+      font-family: "Inter", sans-serif;
+      font-size: 18px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .list { flex: 1; }
+    .list p {
+      margin: 0 0 10px;
+      color: #23314b;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .pill-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .pill {
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: #f1f4fb;
+      color: #38507a;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .plan-btn, .subtle-btn {
+      width: 100%;
+      min-height: 52px;
+      border: 0;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+    .plan-btn:hover, .subtle-btn:hover { filter: brightness(0.97); transform: translateY(-1px); }
+    .plan-btn { color: #fff; background: linear-gradient(135deg, var(--primary), var(--primary2)); }
+    .subtle-btn { color: var(--softText); background: var(--soft); }
+    .section { padding: 14px 0 56px; }
+    .table-wrap, .contact, .cancel-card {
+      border: 1px solid rgba(215, 219, 231, 0.9);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 28px 60px -42px rgba(16, 32, 67, 0.4);
+    }
+    .table-wrap { overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 16px 18px; text-align: left; border-bottom: 1px solid #e7ebf4; }
+    thead th { background: var(--primary); color: #fff; font-family: "Manrope", sans-serif; }
+    .contact, .cancel-card { padding: 22px; }
+    .section-title {
+      margin: 0 0 8px;
+      font-family: "Manrope", sans-serif;
+      font-size: 32px;
+      letter-spacing: -0.03em;
+    }
+    .section-copy {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 13px;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 140px; resize: vertical; grid-column: 1 / -1; }
+    .form-grid button { grid-column: 1 / -1; }
+    .cancel-card {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 18px;
+      align-items: center;
+      margin-top: 18px;
+    }
+    .mascot {
+      position: relative;
+      width: 92px;
+      height: 92px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #fff4d8, #ffd685);
+      box-shadow: inset 0 -10px 20px rgba(193, 134, 23, 0.16);
+    }
+    .mascot::before, .mascot::after {
+      content: "";
+      position: absolute;
+      top: 36px;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #6d4a00;
+    }
+    .mascot::before { left: 28px; }
+    .mascot::after { right: 28px; }
+    .mascot-mouth {
+      position: absolute;
+      left: 50%;
+      bottom: 24px;
+      width: 28px;
+      height: 14px;
+      border-bottom: 4px solid #6d4a00;
+      border-radius: 0 0 22px 22px;
+      transform: translateX(-50%);
+    }
+    .tiny-note { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .notice { margin-top: 14px; color: var(--warn); font-size: 13px; font-weight: 700; }
+    footer {
+      margin-top: 48px;
+      border-top: 1px solid #e5e9f2;
+      background: #f1f4fa;
+    }
+    .footer-inner {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 24px 20px 34px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 16px; }
+    .footer-links a { color: #4f5f79; text-decoration: none; font-size: 13px; }
+    @media (max-width: 1020px) {
+      .cards { grid-template-columns: 1fr; }
+      .cancel-card { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .hero { padding-top: 64px; }
+    }
   </style>
 </head>
 <body>
   <section class="hero">
-    <span class="tag">Subscription Plans</span>
-    <h1>충전형, 구독형 Pro / Business 요금제 비교</h1>
-    <p>당신의 전문성을 더하는 정중한 메시지 작성.<br />사용량에 딱 맞는 합리적인 플랜을 선택하세요.</p>
+    <div class="container">
+      <span class="hero-tag">Subscription Plans</span>
+      <h1>충전형, 구독형 Pro / Business 요금제 비교</h1>
+      <p>당신의 전문성을 더하는 정중한 메시지 작성.<br />사용량에 딱 맞는 합리적인 플랜을 선택하세요.</p>
+      <div id="sessionBar" class="session-bar">
+        <span id="sessionChip" class="chip">로그인 확인됨</span>
+        <div id="sessionCopy" class="session-copy"></div>
+      </div>
+    </div>
   </section>
 
-  <section class="section">
+  <section class="container section">
     <div class="cards">
       <article class="card">
-        <h3>Pro Plan</h3>
-        <div class="sub">개인 사용자를 위한 표준 플랜</div>
-        <div class="price">6,900 <span>원/월</span></div>
+        <span class="card-kicker">개인형</span>
+        <h2>Pro</h2>
+        <p class="desc">짧은 문자, 카톡, 관계 회복용 메시지를 자주 다듬는 분께 맞는 플랜입니다.</p>
+        <div class="price">3,900<span>원 / 월</span></div>
         <div class="list">
-          <p>월 요청 900회</p>
-          <p>입력 토큰 600,000t</p>
-          <p>출력 토큰 360,000t</p>
-          <p>1회 최대 글자 3,200자</p>
+          <p>일 최대 30회</p>
+          <p>월 최대 50회</p>
+          <p>1회 최대 500자</p>
+          <p>배경 설명은 선택 입력, 최대 100자</p>
         </div>
-        <button id="buyProBtn" class="btn btn-sub" type="button">플랜 선택하기</button>
+        <div class="pill-list">
+          <span class="pill">정중하게</span>
+          <span class="pill">친근하게</span>
+          <span class="pill">캐주얼하게</span>
+          <span class="pill">아주 정중하게</span>
+        </div>
+        <div style="margin-top:18px">
+          <button id="buyProBtn" class="plan-btn" type="button">플랜 시작하기</button>
+        </div>
+      </article>
+
+      <article class="card featured">
+        <span class="card-kicker">비즈니스형</span>
+        <h2>Business</h2>
+        <p class="desc">보고 요청, 제안서, 일정 변경, 회식 제안, 업무 변경처럼 긴 업무 문장에 맞춘 플랜입니다.</p>
+        <div class="price">9,900<span>원 / 월</span></div>
+        <div class="list">
+          <p>일 제한 없음</p>
+          <p>월 최대 300회</p>
+          <p>1회 최대 2,000자</p>
+          <p>배경 설명은 선택 입력, 최대 100자</p>
+        </div>
+        <div class="pill-list">
+          <span class="pill">보고 요청</span>
+          <span class="pill">제안서</span>
+          <span class="pill">일정 변경</span>
+          <span class="pill">업무 변경</span>
+        </div>
+        <div style="margin-top:18px">
+          <button id="buyBusinessBtn" class="plan-btn" type="button">플랜 시작하기</button>
+        </div>
       </article>
 
       <article class="card">
-        <h3>Business Plan</h3>
-        <div class="sub">팀과 기업을 위한 고용량 플랜</div>
-        <div class="price">19,900 <span>원/월</span></div>
+        <span class="card-kicker">일회성 충전</span>
+        <h2>Top-up 10</h2>
+        <p class="desc">이번 달 횟수가 잠깐 모자랄 때 가볍게 보충하는 추가 이용권입니다.</p>
+        <div class="price">1,000<span>원 / 10회</span></div>
         <div class="list">
-          <p>월 요청 4,000회</p>
-          <p>입력 토큰 2,800,000t</p>
-          <p>출력 토큰 1,600,000t</p>
-          <p>1회 최대 글자 5,000자</p>
-          <p>우선 순위 고객 지원</p>
+          <p>현재 사용 중인 플랜의 글자수 제한을 그대로 따릅니다.</p>
+          <p>월 제한을 다 쓴 뒤에도 추가 횟수부터 먼저 차감됩니다.</p>
+          <p>가벼운 재구매용 옵션으로 설계되어 있습니다.</p>
         </div>
-        <button id="buyBusinessBtn" class="btn btn-main" type="button">비즈니스 시작하기</button>
+        <div class="pill-list">
+          <span class="pill">1회성 결제</span>
+          <span class="pill">즉시 반영</span>
+          <span class="pill">추가 10회</span>
+        </div>
+        <div style="margin-top:18px">
+          <button id="buyTopupBtn" class="subtle-btn" type="button">10회 충전하기</button>
+        </div>
       </article>
     </div>
-    <p class="note">결제 기능은 순차적으로 오픈되고 있습니다</p>
+
+    <div class="cancel-card">
+      <div class="mascot" aria-hidden="true"><span class="mascot-mouth"></span></div>
+      <div>
+        <h3 class="section-title" style="font-size:28px">진짜로 해지하실 건가요?</h3>
+        <p class="section-copy">언제든 해지할 수 있어요. 그래도 해지하는 순간 바로 끊기지는 않아요. 다음 결제일 전까지는 현재 플랜을 그대로 사용할 수 있고, 그 뒤 무료 플랜으로 전환돼요.</p>
+        <div class="tiny-note">부분 환불은 기본 제공하지 않으며, 사용하지 않은 경우에만 환불 가능합니다.</div>
+        <div class="tiny-note">해지 후 남은 기간에는 작은 안내 문구로 언제든 다시 구독 가능하다고 보여드릴 예정입니다.</div>
+      </div>
+    </div>
   </section>
 
-  <section class="section">
-    <h2 style="font-family:Manrope,sans-serif;font-size:32px;margin:0 0 14px">상세 기능 비교</h2>
+  <section class="container section" style="padding-top:0">
+    <h3 class="section-title">상세 비교</h3>
+    <p class="section-copy">무료 플랜은 체험용으로 가볍게, Pro는 개인 메시지용으로, Business는 긴 업무 문장용으로 나눠 설계했습니다.</p>
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>항목</th><th>Pro Plan</th><th>Business Plan</th></tr>
+          <tr><th>항목</th><th>Free</th><th>Pro</th><th>Business</th></tr>
         </thead>
         <tbody>
-          <tr><td>월 요금</td><td>6,900원</td><td>19,900원</td></tr>
-          <tr><td>월 요청 수</td><td>900회</td><td>4,000회</td></tr>
-          <tr><td>입력 토큰</td><td>600,000t</td><td>2,800,000t</td></tr>
-          <tr><td>출력 토큰</td><td>360,000t</td><td>1,600,000t</td></tr>
-          <tr><td>1회 최대 글자</td><td>3,200자</td><td>5,000자</td></tr>
-          <tr><td>추가 충전 서비스</td><td colspan="2">10회 / 1,000원</td></tr>
+          <tr><td>가격</td><td>무료</td><td>3,900원 / 월</td><td>9,900원 / 월</td></tr>
+          <tr><td>일 제한</td><td>3회</td><td>30회</td><td>없음</td></tr>
+          <tr><td>월 제한</td><td>15회</td><td>50회</td><td>300회</td></tr>
+          <tr><td>1회 최대 글자</td><td>300자</td><td>500자</td><td>2,000자</td></tr>
+          <tr><td>배경 설명</td><td colspan="3">선택 입력, 최대 100자, 참고만 하고 직접 인용하지 않음</td></tr>
+          <tr><td>추가 충전</td><td colspan="3">10회 / 1,000원, 현재 플랜의 글자수 제한 유지</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <section class="section" style="padding-top:0">
+  <section class="container section" style="padding-top:0">
     <div class="contact">
-      <h3>고객 문의 게시판</h3>
-      <p>비회원도 문의를 보낼 수 있습니다. 전송 성공 시 팝업 안내 후 입력 내용이 초기화됩니다.</p>
+      <h3 class="section-title">고객 문의 게시판</h3>
+      <p class="section-copy">비회원도 문의를 남길 수 있습니다. 전송이 끝나면 팝업 안내 후 입력 내용이 초기화됩니다.</p>
       <form id="feedbackForm" class="form-grid">
         <input id="feedbackEmail" type="email" placeholder="답변 받을 이메일" required />
         <select id="feedbackTopic" required>
@@ -116,15 +399,16 @@
           <option value="기타 문의">5) 기타 문의</option>
         </select>
         <textarea id="feedbackMessage" placeholder="문의 내용을 입력해 주세요" required></textarea>
-        <button id="feedbackSubmitBtn" class="btn btn-main" type="submit">문의 남기기</button>
+        <button id="feedbackSubmitBtn" class="plan-btn" type="submit">문의 남기기</button>
       </form>
+      <div id="feedbackNotice" class="notice"></div>
     </div>
   </section>
 
   <footer>
     <div class="footer-inner">
       <strong style="font-family:Manrope,sans-serif">Polite Message Rewriter</strong>
-      <div class="links">
+      <div class="footer-links">
         <a href="/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>
         <a href="/legal/terms" target="_blank" rel="noreferrer">Terms of Service</a>
         <a href="/legal/contact" target="_blank" rel="noreferrer">Contact Us</a>
@@ -137,14 +421,27 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const target = params.get("target") || "";
+    const sessionToken = params.get("sessionToken") || "";
     const apiBaseUrl = window.location.origin;
+
+    const sessionBar = document.getElementById("sessionBar");
+    const sessionChip = document.getElementById("sessionChip");
+    const sessionCopy = document.getElementById("sessionCopy");
     const feedbackForm = document.getElementById("feedbackForm");
     const feedbackSubmitBtn = document.getElementById("feedbackSubmitBtn");
     const feedbackTopicEl = document.getElementById("feedbackTopic");
     const feedbackMsgEl = document.getElementById("feedbackMessage");
+    const feedbackNotice = document.getElementById("feedbackNotice");
+
+    function authHeaders() {
+      return {
+        "Content-Type": "application/json",
+        "x-session-token": sessionToken
+      };
+    }
 
     function prefillByTarget(value) {
-      if (value === "pro" || value === "pro_monthly") {
+      if (value === "pro") {
         feedbackTopicEl.value = "충전 문의";
         feedbackMsgEl.value = "Pro 플랜 관련 문의입니다.\n";
       }
@@ -158,9 +455,52 @@
       }
     }
 
+    async function refreshSessionCard() {
+      if (!sessionToken) return;
+      try {
+        const res = await fetch(apiBaseUrl + "/api/auth/session", {
+          method: "GET",
+          headers: { "x-session-token": sessionToken }
+        });
+        const json = await res.json();
+        if (!res.ok) return;
+
+        sessionBar.classList.add("visible");
+        const label = json.planId === "business"
+          ? "Business 플랜 로그인 상태"
+          : json.planId === "pro"
+            ? "Pro 플랜 로그인 상태"
+            : "Free 로그인 상태";
+        sessionChip.textContent = label;
+        sessionCopy.textContent = `${json.email} 계정으로 로그인되어 있습니다. 지금 결제하면 이 계정 기준으로 플랜과 추가 충전이 반영됩니다.`;
+      } catch (_err) {
+        // ignore
+      }
+    }
+
+    async function startCheckout(planId) {
+      if (!sessionToken) {
+        alert("확장 프로그램에서 Google 로그인 후 다시 열어 주세요.");
+        return;
+      }
+      try {
+        const res = await fetch(apiBaseUrl + "/api/billing/create-checkout", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ planId })
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "결제 시작 실패");
+        window.location.href = json.checkoutUrl;
+      } catch (err) {
+        alert(String(err.message || err));
+      }
+    }
+
     feedbackForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       feedbackSubmitBtn.disabled = true;
+      feedbackNotice.textContent = "";
       try {
         const payload = {
           email: document.getElementById("feedbackEmail").value.trim(),
@@ -177,22 +517,18 @@
         feedbackForm.reset();
         alert("문의가 정상 전송되었습니다.");
       } catch (err) {
-        alert(String(err.message || err));
+        feedbackNotice.textContent = String(err.message || err);
       } finally {
         feedbackSubmitBtn.disabled = false;
       }
     });
 
-    document.getElementById("buyProBtn").addEventListener("click", () => {
-      prefillByTarget("pro");
-      feedbackForm.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-    document.getElementById("buyBusinessBtn").addEventListener("click", () => {
-      prefillByTarget("business");
-      feedbackForm.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
+    document.getElementById("buyProBtn").addEventListener("click", () => startCheckout("pro"));
+    document.getElementById("buyBusinessBtn").addEventListener("click", () => startCheckout("business"));
+    document.getElementById("buyTopupBtn").addEventListener("click", () => startCheckout("topup10"));
 
     prefillByTarget(target);
+    refreshSessionCard();
   </script>
 </body>
 </html>

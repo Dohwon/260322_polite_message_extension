@@ -15,7 +15,7 @@ export const env = {
   ipQuotaSalt: process.env.IP_QUOTA_SALT || "local-dev-ip-quota-salt-change-me",
   unlimitedBypassEmails:
     process.env.UNLIMITED_BYPASS_EMAILS || "dowonkim0612@gmail.com",
-  feedbackNotifyEmail: process.env.FEEDBACK_NOTIFY_EMAIL || "dowonkim0612@gmail.com",
+  feedbackNotifyEmail: process.env.FEEDBACK_NOTIFY_EMAIL || "politemsg.support@gmail.com",
   resendApiKey: process.env.RESEND_API_KEY || "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL || "Polite Message <onboarding@resend.dev>",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
@@ -37,34 +37,37 @@ export const PLANS = {
     monthlyPriceKrw: 0,
     yearlyPriceKrw: 0,
     billingCycle: "trial",
-    maxMonthlyRequests: 5,
-    maxMonthlyInputTokens: 100,
-    maxMonthlyOutputTokens: 100,
-    maxCharsPerRequest: 1000,
+    dailyRequestLimit: 3,
+    maxMonthlyRequests: 15,
+    maxMonthlyInputTokens: 12000,
+    maxMonthlyOutputTokens: 12000,
+    maxCharsPerRequest: 300,
     model: env.openaiFreeModel
   },
-  pro_monthly: {
-    id: "pro_monthly",
-    name: "Pro Monthly",
-    monthlyPriceKrw: 4900,
+  pro: {
+    id: "pro",
+    name: "Pro",
+    monthlyPriceKrw: 3900,
     yearlyPriceKrw: null,
     billingCycle: "monthly",
+    dailyRequestLimit: 30,
     maxMonthlyRequests: 50,
-    maxMonthlyInputTokens: 320000,
-    maxMonthlyOutputTokens: 220000,
-    maxCharsPerRequest: 4000,
+    maxMonthlyInputTokens: 90000,
+    maxMonthlyOutputTokens: 65000,
+    maxCharsPerRequest: 500,
     model: env.openaiDefaultModel
   },
-  pro_annual: {
-    id: "pro_annual",
-    name: "Pro Annual",
-    monthlyPriceKrw: 3250,
-    yearlyPriceKrw: 39000,
-    billingCycle: "annual",
-    maxMonthlyRequests: 100,
-    maxMonthlyInputTokens: 640000,
-    maxMonthlyOutputTokens: 440000,
-    maxCharsPerRequest: 4000,
+  business: {
+    id: "business",
+    name: "Business",
+    monthlyPriceKrw: 9900,
+    yearlyPriceKrw: null,
+    billingCycle: "monthly",
+    dailyRequestLimit: null,
+    maxMonthlyRequests: 300,
+    maxMonthlyInputTokens: 900000,
+    maxMonthlyOutputTokens: 700000,
+    maxCharsPerRequest: 2000,
     model: env.openaiDefaultModel
   }
 };
@@ -78,7 +81,12 @@ export const TONES = [
   "공손하지만 단호하게",
   "미안함",
   "제안함",
-  "사랑함"
+  "사랑함",
+  "보고 요청",
+  "제안서",
+  "일정 변경",
+  "회식 제안",
+  "업무 변경"
 ];
 
 export const RECIPIENTS = ["상사", "동료", "친구", "학부모", "고객", "거래처", "연인", "가족", "기타"];

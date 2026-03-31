@@ -11,7 +11,6 @@ import {
   addUsage,
   clearUserSession,
   consumeFreeDailyUsage,
-  consumeFreeIpDailyUsage,
   consumeBonusRequest,
   createFeedback,
   createTossOrder,
@@ -19,7 +18,6 @@ import {
   dbHealth,
   ensureMonthlyUsage,
   getFreeDailyUsage,
-  getFreeIpDailyUsage,
   getTossOrdersByUser,
   getTossOrderByOrderId,
   getCurrentMonthlyUsage,
@@ -49,7 +47,9 @@ const __dirname = path.dirname(__filename);
 const plansLandingPath = path.join(__dirname, "plans-landing.html");
 const oauthPendingStates = new Map();
 const oauthDeviceResults = new Map();
-const FREE_DAILY_LIMIT = 5;
+const TOPUP_10_PLAN_ID = "topup10";
+const TOPUP_10_REQUESTS = 10;
+const TOPUP_10_PRICE_KRW = 1000;
 
 function normalizeEmailForBypass(email) {
   const raw = String(email || "").trim().toLowerCase();
@@ -99,7 +99,10 @@ function extractResponseText(response) {
 }
 
 function pickPlan(planId) {
-  return PLANS[planId] || PLANS.free;
+  const normalized = String(planId || "").trim();
+  if (normalized === "pro_monthly") return PLANS.pro;
+  if (normalized === "pro_annual") return PLANS.business;
+  return PLANS[normalized] || PLANS.free;
 }
 
 function nowPlusDays(days) {
@@ -231,21 +234,28 @@ const FEEDBACK_TOPICS = new Set([
   "기타 문의"
 ]);
 
-function usageSummary(user, monthly, freeDailyUsedAccount = 0, freeDailyUsedIp = 0) {
+function usageSummary(user, monthly, freeDailyUsedAccount = 0) {
   const plan = pickPlan(user.plan_id);
   const isUnlimited = isUnlimitedBypassUser(user);
   const safeDailyUsedAccount = Number(freeDailyUsedAccount || 0);
-  const safeDailyUsedIp = Number(freeDailyUsedIp || 0);
-  const freeDailyRemaining = isUnlimited
-    ? FREE_DAILY_LIMIT
-    : Math.max(0, FREE_DAILY_LIMIT - safeDailyUsedAccount);
+  const dailyLimit = Number.isFinite(plan.dailyRequestLimit) ? Number(plan.dailyRequestLimit) : null;
+  const dailyRemaining = isUnlimited
+    ? dailyLimit
+    : dailyLimit === null
+      ? null
+      : Math.max(0, dailyLimit - safeDailyUsedAccount);
+  const monthlyRemaining =
+    isUnlimited || !Number.isFinite(plan.maxMonthlyRequests)
+      ? null
+      : Math.max(0, Number(plan.maxMonthlyRequests) - Number(monthly.request_count || 0));
   return {
-    planId: user.plan_id,
+    planId: plan.id,
     planName: plan.name,
     monthlyPriceKrw: plan.monthlyPriceKrw,
     yearlyPriceKrw: plan.yearlyPriceKrw ?? null,
     billingCycle: plan.billingCycle || "monthly",
     limits: {
+      dailyRequestLimit: dailyLimit,
       maxMonthlyRequests: plan.maxMonthlyRequests,
       maxMonthlyInputTokens: plan.maxMonthlyInputTokens,
       maxMonthlyOutputTokens: plan.maxMonthlyOutputTokens,
@@ -255,11 +265,11 @@ function usageSummary(user, monthly, freeDailyUsedAccount = 0, freeDailyUsedIp =
       requestCount: monthly.request_count,
       inputTokens: monthly.input_tokens,
       outputTokens: monthly.output_tokens,
-      freeCreditsRemaining: freeDailyRemaining,
-      freeCreditsTotal: FREE_DAILY_LIMIT,
-      freeDailyLimit: FREE_DAILY_LIMIT,
+      freeCreditsRemaining: dailyRemaining,
+      freeCreditsTotal: dailyLimit,
+      freeDailyLimit: dailyLimit,
       freeDailyUsedAccount: safeDailyUsedAccount,
-      freeDailyUsedIp: safeDailyUsedIp,
+      monthlyRequestsRemaining: monthlyRemaining,
       isUnlimited,
       bonusRequestsRemaining: user.bonus_requests_remaining ?? 0
     },
@@ -359,7 +369,7 @@ app.get("/api/meta", (_req, res) => {
       enabled: tossEnabled,
       provider: tossEnabled ? "toss" : "disabled",
       hasPlanPrices: true,
-      hasTopupPrice: false
+      hasTopupPrice: true
     },
     auth: {
       provider: "google",
@@ -479,15 +489,13 @@ app.get("/api/auth/google/callback", async (req, res) => {
     const session = createSession(user.id, true);
     const updatedUser = setUserSession(user.id, session.token, session.expiresAt);
     const monthly = ensureMonthlyUsage(updatedUser.id);
-    const ipHash = getRequestIpHash(req);
     const freeDaily = getFreeDailyUsage(updatedUser.id);
-    const freeIpDaily = ipHash ? getFreeIpDailyUsage(ipHash) : null;
     oauthDeviceResults.set(pending.deviceId, {
       expiresAtMs: Date.now() + 5 * 60 * 1000,
       payload: {
         sessionToken: session.token,
         email: updatedUser.email,
-        ...usageSummary(updatedUser, monthly, freeDaily?.used_count || 0, freeIpDaily?.used_count || 0)
+        ...usageSummary(updatedUser, monthly, freeDaily?.used_count || 0)
       }
     });
 
@@ -524,25 +532,21 @@ function auth(req, res, next) {
 }
 
 app.get("/api/me", auth, (req, res) => {
-  const ipHash = getRequestIpHash(req);
   const freeDaily = getFreeDailyUsage(req.user.id);
-  const freeIpDaily = ipHash ? getFreeIpDailyUsage(ipHash) : null;
   const monthly = getCurrentMonthlyUsage(req.user.id);
   res.json({
     email: req.user.email,
-    ...usageSummary(req.user, monthly, freeDaily?.used_count || 0, freeIpDaily?.used_count || 0)
+    ...usageSummary(req.user, monthly, freeDaily?.used_count || 0)
   });
 });
 
 app.get("/api/auth/session", auth, (req, res) => {
-  const ipHash = getRequestIpHash(req);
   const freeDaily = getFreeDailyUsage(req.user.id);
-  const freeIpDaily = ipHash ? getFreeIpDailyUsage(ipHash) : null;
   const monthly = getCurrentMonthlyUsage(req.user.id);
   return res.json({
     ok: true,
     email: req.user.email,
-    ...usageSummary(req.user, monthly, freeDaily?.used_count || 0, freeIpDaily?.used_count || 0)
+    ...usageSummary(req.user, monthly, freeDaily?.used_count || 0)
   });
 });
 
@@ -723,7 +727,7 @@ app.post("/admin/test/bootstrap-user", (req, res) => {
     ok: true,
     email: user.email,
     sessionToken: session.token,
-    ...usageSummary(user, monthly, freeDaily?.used_count || 0, 0)
+    ...usageSummary(user, monthly, freeDaily?.used_count || 0)
   });
 });
 
@@ -736,12 +740,13 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   const isUnlimited = isUnlimitedBypassUser(user);
   const plan = pickPlan(user.plan_id);
   const monthly = getCurrentMonthlyUsage(user.id);
-  const ipHash = getRequestIpHash(req);
 
   const originalText = String(req.body?.originalText || "").trim();
   const tone = sanitizeTone(req.body?.tone);
   const recipient = sanitizeRecipient(req.body?.recipient);
   const senderRole = String(req.body?.senderRole || "발신자").trim();
+  const backgroundNote = String(req.body?.backgroundNote || "").trim().slice(0, 100);
+  const harshFilterEnabled = Boolean(req.body?.harshFilterEnabled ?? true);
 
   if (!originalText) {
     return res.status(400).json({ error: "원본 문자를 입력해 주세요." });
@@ -754,22 +759,17 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   }
 
   const hasBonus = Number(user.bonus_requests_remaining || 0) > 0;
-  if (!isUnlimited && user.plan_id === "free") {
-    const freeDaily = getFreeDailyUsage(user.id);
-    const accountUsedCount = Number(freeDaily?.used_count || 0);
-    const ipDaily = ipHash ? getFreeIpDailyUsage(ipHash) : null;
-    const ipUsedCount = Number(ipDaily?.used_count || 0);
-    if (!hasBonus && accountUsedCount >= FREE_DAILY_LIMIT) {
-      return res.status(402).json({
-        error: `오늘 계정 무료 사용 ${FREE_DAILY_LIMIT}회를 모두 사용했습니다. 내일 다시 초기화됩니다.`
-      });
-    }
-    if (ipHash && ipUsedCount >= FREE_DAILY_LIMIT && !hasBonus) {
-      return res.status(429).json({
-        error: `오늘 현재 네트워크(IP)의 무료 사용 ${FREE_DAILY_LIMIT}회를 모두 사용했습니다. 내일 다시 초기화됩니다.`
-      });
-    }
-  } else if (!isUnlimited) {
+  const dailyLimit = Number.isFinite(plan.dailyRequestLimit) ? Number(plan.dailyRequestLimit) : null;
+  const currentDailyUsage = getFreeDailyUsage(user.id);
+  const dailyUsedCount = Number(currentDailyUsage?.used_count || 0);
+
+  if (!isUnlimited && dailyLimit !== null && !hasBonus && dailyUsedCount >= dailyLimit) {
+    return res.status(402).json({
+      error: `오늘 사용 가능한 ${dailyLimit}회를 모두 사용했습니다. 내일 다시 초기화됩니다.`
+    });
+  }
+
+  if (!isUnlimited) {
     const hasRequestLimit = Number.isFinite(plan.maxMonthlyRequests);
     const requestLimitExceeded = hasRequestLimit && monthly.request_count >= plan.maxMonthlyRequests;
     const hasInputTokenLimit = Number.isFinite(plan.maxMonthlyInputTokens);
@@ -779,12 +779,18 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
       (hasOutputTokenLimit && monthly.output_tokens >= plan.maxMonthlyOutputTokens);
     if ((requestLimitExceeded || tokenLimitExceeded) && !hasBonus) {
       return res.status(402).json({
-        error: "이번 달 사용 한도를 모두 사용했습니다. 준비중인 10회 추가 기능 오픈 후 계속 사용할 수 있습니다."
+        error: "이번 달 사용 한도를 모두 사용했습니다. 10회 추가 충전 후 계속 사용할 수 있습니다."
       });
     }
   }
 
-  const { system, context } = buildRewritePrompt({ tone, recipient, senderRole });
+  const { system, context } = buildRewritePrompt({
+    tone,
+    recipient,
+    senderRole,
+    backgroundNote,
+    harshFilterEnabled
+  });
 
   try {
     let inputTokens = 0;
@@ -831,21 +837,14 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
       // unlimited bypass account: usage metrics are recorded, quota is not consumed
     } else if (hasBonus) {
       consumeBonusRequest(user.id);
-    } else if (user.plan_id === "free") {
-      const consumedAccount = consumeFreeDailyUsage(user.id, FREE_DAILY_LIMIT);
+    } else if (dailyLimit !== null) {
+      const consumedAccount = consumeFreeDailyUsage(user.id, dailyLimit);
       if (!consumedAccount) {
-        return res.status(402).json({ error: "오늘 계정 무료 사용량이 이미 소진되었습니다." });
-      }
-      if (ipHash) {
-        const consumedIp = consumeFreeIpDailyUsage(ipHash, FREE_DAILY_LIMIT);
-        if (!consumedIp) {
-          return res.status(429).json({ error: "오늘 현재 네트워크(IP)의 무료 사용량 5회가 모두 소진되었습니다." });
-        }
+        return res.status(402).json({ error: "오늘 사용 가능한 횟수가 이미 소진되었습니다." });
       }
     }
     const refreshedUser = req.user;
     const freeDailyAfter = getFreeDailyUsage(user.id);
-    const freeIpDailyAfter = ipHash ? getFreeIpDailyUsage(ipHash) : null;
 
     if (!rewritten) {
       return res.status(502).json({ error: "변환 결과를 생성하지 못했습니다. 다시 시도해 주세요." });
@@ -859,8 +858,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
         monthly: usageSummary(
           refreshedUser,
           updated,
-          freeDailyAfter?.used_count || 0,
-          freeIpDailyAfter?.used_count || 0
+          freeDailyAfter?.used_count || 0
         ).usage
       }
     });
@@ -876,20 +874,21 @@ app.post("/api/billing/create-checkout", auth, async (req, res) => {
     });
   }
   const planId = String(req.body?.planId || "").trim();
-  if (!["pro_monthly", "pro_annual"].includes(planId)) {
+  if (!["pro", "business", TOPUP_10_PLAN_ID].includes(planId)) {
     return res.status(400).json({ error: "지원하지 않는 플랜입니다." });
   }
   if (!tossEnabled) {
     return res.status(500).json({ error: "토스 결제가 아직 설정되지 않았습니다." });
   }
-  const plan = pickPlan(planId);
   const orderId = createNonce("toss");
+  const isTopup = planId === TOPUP_10_PLAN_ID;
+  const plan = isTopup ? null : pickPlan(planId);
   createTossOrder({
     orderId,
     userId: req.user.id,
-    kind: "plan",
+    kind: isTopup ? "topup" : "plan",
     planId,
-    amount: plan.billingCycle === "annual" ? plan.yearlyPriceKrw : plan.monthlyPriceKrw
+    amount: isTopup ? TOPUP_10_PRICE_KRW : plan.monthlyPriceKrw
   });
   return res.json({
     checkoutUrl: `${requestBaseUrl(req)}/billing/toss/checkout?orderId=${encodeURIComponent(orderId)}`,
@@ -905,11 +904,12 @@ app.get("/billing/toss/checkout", (req, res) => {
   }
 
   const isPlan = order.kind === "plan";
-  const title = isPlan
-    ? order.plan_id === "pro_annual"
-      ? "Pro Annual 이용권"
-      : "Pro Monthly 이용권"
-    : "Polite Message Rewriter 이용권";
+  const title =
+    order.kind === "topup"
+      ? "10회 추가 충전"
+      : isPlan
+        ? pickPlan(order.plan_id).name + " 이용권"
+        : "Polite Message Rewriter 이용권";
 
   const customerKey = `user_${order.user_id}`;
   const baseUrl = requestBaseUrl(req);
@@ -938,9 +938,10 @@ app.get("/billing/toss/checkout", (req, res) => {
       <p><b>결제금액:</b> ${order.amount.toLocaleString("ko-KR")}원</p>
       <p><b>포함 내용</b></p>
       <ul>
-        <li>Free: 총 5회 체험, 월 토큰 한도 100</li>
-        <li>Pro Monthly: 월 50회, 1회 4,000자</li>
-        <li>Pro Annual: 매달 100회, 1회 4,000자</li>
+        <li>Free: 하루 3회, 월 최대 15회, 1회 300자</li>
+        <li>Pro: 월 50회, 일 30회, 1회 500자</li>
+        <li>Business: 월 300회, 1회 2,000자</li>
+        <li>추가 충전: 10회 1,000원</li>
         <li>로그인은 Google 계정만 지원합니다.</li>
       </ul>
       <button id="payBtn">토스 결제하기</button>
@@ -996,7 +997,7 @@ app.get("/billing/toss/success", async (req, res) => {
 
     markTossOrderPaid(orderId, paymentKey);
 
-    if (order.kind === "plan" && ["pro_monthly", "pro_annual"].includes(order.plan_id || "")) {
+    if (order.kind === "plan" && ["pro", "business"].includes(order.plan_id || "")) {
       updatePlan({
         userId: order.user_id,
         planId: order.plan_id,
@@ -1004,6 +1005,10 @@ app.get("/billing/toss/success", async (req, res) => {
         stripeSubscriptionId: null,
         subscriptionStatus: "active"
       });
+    }
+
+    if (order.kind === "topup" && order.plan_id === TOPUP_10_PLAN_ID) {
+      addBonusRequests(order.user_id, TOPUP_10_REQUESTS);
     }
 
     return res.send("결제가 완료되었습니다. 익스텐션으로 돌아가 다시 시도해 주세요.");
@@ -1045,7 +1050,7 @@ app.get("/legal/privacy", (_req, res) => {
       `
       <p>Polite Message Rewriter는 서비스 제공을 위해 최소한의 정보(로그인 식별자, 사용량 정보, 결제 기록)를 처리합니다.</p>
       <p>메시지 변환 요청 내용은 품질 개선 목적의 장기 저장을 기본으로 하지 않으며, 운영 안정성 목적의 제한적 로그만 보관할 수 있습니다.</p>
-      <p>문의: support@polite-message.app</p>
+      <p>문의: <a href="mailto:politemsg.support@gmail.com">politemsg.support@gmail.com</a></p>
       <p>시행일: 2026-03-23</p>
       `
     )
@@ -1060,6 +1065,8 @@ app.get("/legal/terms", (_req, res) => {
       <p>본 서비스는 사용자가 입력한 문장을 선택한 톤으로 재작성하는 도구입니다.</p>
       <p>서비스 악용, 불법 콘텐츠 생성, 타인 권리 침해 행위는 금지됩니다.</p>
       <p>요금제는 Free/Pro/Business 정책에 따르며, 결제 조건은 결제 페이지 안내를 우선합니다.</p>
+      <p>구독은 1개월 단위로 운영되며, 중도 해지해도 다음 결제일 전까지 현재 플랜을 유지합니다. 이후 무료 플랜으로 전환되며 재가입할 수 있습니다.</p>
+      <p>부분 환불은 기본 제공하지 않으며, 사용하지 않은 경우에만 환불 가능합니다.</p>
       <p>시행일: 2026-03-23</p>
       `
     )
@@ -1072,7 +1079,7 @@ app.get("/legal/contact", (_req, res) => {
       "Contact Us",
       `
       <p>서비스 문의 및 제휴 문의는 아래 채널로 접수해 주세요.</p>
-      <p>Email: support@polite-message.app</p>
+      <p>Email: <a href="mailto:politemsg.support@gmail.com">politemsg.support@gmail.com</a></p>
       <p>운영시간: 평일 10:00 ~ 18:00 (KST)</p>
       `
     )

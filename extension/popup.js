@@ -8,6 +8,9 @@ const STORAGE_KEYS = {
   tone: "tone",
   recipient: "recipient",
   senderRole: "senderRole",
+  backgroundNote: "backgroundNote",
+  backgroundExpanded: "backgroundExpanded",
+  harshFilterEnabled: "harshFilterEnabled",
   draftOriginalText: "draftOriginalText",
   draftRewrittenText: "draftRewrittenText"
 };
@@ -19,17 +22,21 @@ const els = {
   logoutBtn: document.getElementById("logoutBtn"),
   plansInfoBtn: document.getElementById("plansInfoBtn"),
   planSummary: document.getElementById("planSummary"),
+  managePlanBtn: document.getElementById("managePlanBtn"),
   tone: document.getElementById("tone"),
   recipient: document.getElementById("recipient"),
   senderRole: document.getElementById("senderRole"),
+  backgroundToggleBtn: document.getElementById("backgroundToggleBtn"),
+  backgroundWrap: document.getElementById("backgroundWrap"),
+  backgroundNote: document.getElementById("backgroundNote"),
+  backgroundNoteMeta: document.getElementById("backgroundNoteMeta"),
+  harshFilterEnabled: document.getElementById("harshFilterEnabled"),
   originalText: document.getElementById("originalText"),
   originalTextError: document.getElementById("originalTextError"),
   rewrittenText: document.getElementById("rewrittenText"),
   rewriteBtn: document.getElementById("rewriteBtn"),
   resetBtn: document.getElementById("resetBtn"),
   copyBtn: document.getElementById("copyBtn"),
-  proBtn: document.getElementById("proBtn"),
-  businessBtn: document.getElementById("businessBtn"),
   topupBtn: document.getElementById("topupBtn"),
   status: document.getElementById("status")
 };
@@ -45,9 +52,10 @@ const state = {
 function setStatus(message, variant = "info") {
   if (!els.status) return;
   els.status.textContent = message || "";
-  els.status.classList.remove("error", "success");
+  els.status.classList.remove("error", "success", "warning");
   if (variant === "error") els.status.classList.add("error");
   if (variant === "success") els.status.classList.add("success");
+  if (variant === "warning") els.status.classList.add("warning");
 }
 
 function setAuthStatus(message, variant = "info") {
@@ -98,19 +106,48 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function remainingMonthlyCount(user) {
+  const limit = Number(user?.limits?.maxMonthlyRequests || 0);
+  const used = Number(user?.usage?.requestCount || 0);
+  if (!Number.isFinite(limit) || limit <= 0) return null;
+  return Math.max(0, limit - used);
+}
+
+function lowBalanceVariant(user) {
+  const remaining = remainingMonthlyCount(user);
+  if (user?.planId === "pro" && remaining !== null && remaining <= 10) return "warning";
+  if (user?.planId === "business" && remaining !== null && remaining <= 20) return "warning";
+  return "success";
+}
+
+function updateBackgroundMeta() {
+  if (!els.backgroundNoteMeta || !els.backgroundNote) return;
+  const count = (els.backgroundNote.value || "").trim().length;
+  els.backgroundNoteMeta.textContent = `${count}/100자. 참고만 하고 결과문에 직접 인용하지 않습니다.`;
+}
+
+function setBackgroundExpanded(expanded) {
+  if (!els.backgroundWrap || !els.backgroundToggleBtn) return;
+  els.backgroundWrap.classList.toggle("hidden", !expanded);
+  els.backgroundToggleBtn.textContent = expanded ? "상황 설명 접기" : "상황 설명 추가";
+}
+
 function usageText(user) {
   if (!user?.usage || !user?.limits) return "";
 
-  const used = Number(user.usage.requestCount || 0);
-  const limit = Number(user.limits.maxMonthlyRequests || 0);
-
   if (user.planId === "free") {
-    const accountUsed = Number(user.usage.freeDailyUsedAccount || 0);
-    const ipUsed = Number(user.usage.freeDailyUsedIp || 0);
-    return `일일 무료 ${user.usage.freeCreditsRemaining}/${user.usage.freeCreditsTotal}회 남음 (계정 ${accountUsed}/5 · IP ${ipUsed}/5)`;
+    const dailyRemaining = Number(user.usage.freeCreditsRemaining || 0);
+    const dailyTotal = Number(user.usage.freeCreditsTotal || 0);
+    const monthlyRemaining = remainingMonthlyCount(user);
+    if (monthlyRemaining === null) {
+      return `일일 무료 ${dailyRemaining}/${dailyTotal}회 남음`;
+    }
+    return `일일 무료 ${dailyRemaining}/${dailyTotal}회 남음 · 이번 달 ${monthlyRemaining}회 남음`;
   }
 
-  return `${user.planName} · 이번 달 ${used}/${limit}회 사용 · 보너스 ${user.usage.bonusRequestsRemaining || 0}회`;
+  const monthlyRemaining = remainingMonthlyCount(user);
+  const bonus = Number(user.usage.bonusRequestsRemaining || 0);
+  return `${user.planName} · 이번 달 ${monthlyRemaining}회 남음${bonus > 0 ? ` · 추가 ${bonus}회` : ""}`;
 }
 
 function authHeaders() {
@@ -133,33 +170,32 @@ function updateAuthUI() {
     els.logoutBtn.classList.toggle("hidden", !isLoggedIn);
   }
   if (els.rewriteBtn) els.rewriteBtn.disabled = !isLoggedIn;
-
-  if (els.proBtn) els.proBtn.disabled = true;
-  if (els.businessBtn) els.businessBtn.disabled = true;
-  if (els.topupBtn) els.topupBtn.disabled = true;
+  if (els.topupBtn) els.topupBtn.disabled = !isLoggedIn;
 
   if (!isLoggedIn) {
     if (els.accountSummary) {
-      els.accountSummary.textContent =
-        "Google 계정으로 로그인하면 Free 일일 5회(계정/IP 각각 제한)로 시작합니다.";
+      els.accountSummary.textContent = "Google 계정으로 로그인해 주세요.";
     }
     if (els.planSummary) {
-      els.planSummary.textContent =
-        loginPending
-          ? "Google 로그인 확인 중입니다..."
-          : "Free 일일 제한: 계정 5회 + IP 5회 / PRO / Business / 10회 추가는 준비중";
+      els.planSummary.textContent = loginPending
+        ? "Google 로그인 확인 중입니다..."
+        : "요금제 변경 버튼에서 정책을 확인할 수 있습니다.";
     }
     return;
   }
 
   if (els.accountSummary) {
-    els.accountSummary.textContent = `${state.user.email} · ${
-      state.user.member?.authProvider || "google"
-    } 로그인 · ${state.user.member?.isRegistered ? "회원 등록 완료" : "미등록"}`;
+    els.accountSummary.textContent = state.user.email || "로그인 계정";
   }
 
   if (els.planSummary) {
-    els.planSummary.textContent = usageText(state.user);
+    if (state.user.planId === "business") {
+      els.planSummary.textContent = "비즈니스 플랜 사용자입니다.";
+    } else if (state.user.planId === "pro") {
+      els.planSummary.textContent = "프로 플랜 사용자입니다.";
+    } else {
+      els.planSummary.textContent = "3회 무료 사용 계정입니다.";
+    }
   }
 }
 
@@ -167,7 +203,10 @@ async function saveLocalState() {
   await chrome.storage.sync.set({
     [STORAGE_KEYS.tone]: els.tone?.value || "정중하게",
     [STORAGE_KEYS.recipient]: els.recipient?.value || "기타",
-    [STORAGE_KEYS.senderRole]: els.senderRole?.value?.trim() || ""
+    [STORAGE_KEYS.senderRole]: els.senderRole?.value?.trim() || "",
+    [STORAGE_KEYS.backgroundNote]: els.backgroundNote?.value?.trim() || "",
+    [STORAGE_KEYS.backgroundExpanded]: !els.backgroundWrap?.classList.contains("hidden"),
+    [STORAGE_KEYS.harshFilterEnabled]: Boolean(els.harshFilterEnabled?.checked)
   });
 
   if (state.sessionToken) {
@@ -190,7 +229,10 @@ async function loadLocalState() {
   const sync = await chrome.storage.sync.get([
     STORAGE_KEYS.tone,
     STORAGE_KEYS.recipient,
-    STORAGE_KEYS.senderRole
+    STORAGE_KEYS.senderRole,
+    STORAGE_KEYS.backgroundNote,
+    STORAGE_KEYS.backgroundExpanded,
+    STORAGE_KEYS.harshFilterEnabled
   ]);
 
   const local = await chrome.storage.local.get([
@@ -204,8 +246,12 @@ async function loadLocalState() {
   if (els.tone) els.tone.value = sync[STORAGE_KEYS.tone] || "정중하게";
   if (els.recipient) els.recipient.value = sync[STORAGE_KEYS.recipient] || "기타";
   if (els.senderRole) els.senderRole.value = sync[STORAGE_KEYS.senderRole] || "";
+  if (els.backgroundNote) els.backgroundNote.value = sync[STORAGE_KEYS.backgroundNote] || "";
+  if (els.harshFilterEnabled) els.harshFilterEnabled.checked = sync[STORAGE_KEYS.harshFilterEnabled] !== false;
   if (els.originalText) els.originalText.value = local[STORAGE_KEYS.draftOriginalText] || "";
   if (els.rewrittenText) els.rewrittenText.value = local[STORAGE_KEYS.draftRewrittenText] || "";
+  setBackgroundExpanded(Boolean(sync[STORAGE_KEYS.backgroundExpanded]));
+  updateBackgroundMeta();
 
   state.sessionToken = local[STORAGE_KEYS.sessionToken] || "";
   return {
@@ -227,7 +273,8 @@ async function refreshSession() {
   if (!state.sessionToken) {
     state.user = null;
     updateAuthUI();
-    setStatus("Google 로그인 후 사용할 수 있습니다. Free 일일 5회(계정/IP 각각 제한)가 제공됩니다.");
+    setAuthStatus("", "info");
+    setStatus("Google 로그인 후 사용할 수 있습니다.");
     return;
   }
 
@@ -248,8 +295,8 @@ async function refreshSession() {
     state.user = json;
     state.autoReloginTriggered = false;
     updateAuthUI();
-    setAuthStatus("Google 로그인 연결됨", "success");
-    setStatus(`로그인됨 | ${usageText(json)}`, "success");
+    setAuthStatus("Google 로그인", "success");
+    setStatus(usageText(json), lowBalanceVariant(json));
   } catch (err) {
     state.user = null;
     state.sessionToken = "";
@@ -313,7 +360,7 @@ async function pollGoogleLogin(deviceId, { silent = false } = {}) {
 
       updateAuthUI();
       setAuthStatus("Google 로그인 완료", "success");
-      setStatus(`로그인 완료 | ${usageText(json)}`, "success");
+      setStatus(usageText(json), lowBalanceVariant(json));
       return;
     }
 
@@ -416,7 +463,7 @@ async function rewrite() {
   }
 
   if (els.rewriteBtn) els.rewriteBtn.disabled = true;
-  setStatus("정중한 문장으로 다듬는 중...");
+  setStatus("메세지를 다듬는 중...");
 
   try {
     const res = await fetch(`${state.apiBaseUrl}/api/rewrite`, {
@@ -426,7 +473,9 @@ async function rewrite() {
         originalText: els.originalText?.value?.trim() || "",
         tone: els.tone?.value || "정중하게",
         recipient: els.recipient?.value || "기타",
-        senderRole: els.senderRole?.value?.trim() || "발신자"
+        senderRole: els.senderRole?.value?.trim() || "발신자",
+        backgroundNote: els.backgroundNote?.value?.trim() || "",
+        harshFilterEnabled: Boolean(els.harshFilterEnabled?.checked)
       })
     });
 
@@ -442,7 +491,7 @@ async function rewrite() {
     await saveDraftTexts();
 
     await refreshSession();
-    setStatus(`완료 | ${usageText(state.user)}`, "success");
+    setStatus(`완료 | ${usageText(state.user)}`, lowBalanceVariant(state.user));
   } catch (err) {
     setStatus(normalizeFetchError(err), "error");
   } finally {
@@ -453,7 +502,10 @@ async function rewrite() {
 async function resetDraft() {
   if (els.originalText) els.originalText.value = "";
   if (els.rewrittenText) els.rewrittenText.value = "";
+  if (els.backgroundNote) els.backgroundNote.value = "";
   setFieldError(els.originalText, els.originalTextError, "");
+  updateBackgroundMeta();
+  await saveLocalState();
   await chrome.storage.local.remove([STORAGE_KEYS.draftOriginalText, STORAGE_KEYS.draftRewrittenText]);
   setStatus("입력/결과를 초기화했습니다.", "success");
 }
@@ -501,11 +553,19 @@ safeBind(els.rewriteBtn, "click", rewrite, "rewriteBtn");
 safeBind(els.resetBtn, "click", resetDraft, "resetBtn");
 safeBind(els.copyBtn, "click", copyResult, "copyBtn");
 safeBind(els.plansInfoBtn, "click", () => goPlans(""), "plansInfoBtn");
-safeBind(els.proBtn, "click", () => goPlans("pro"), "proBtn");
-safeBind(els.businessBtn, "click", () => goPlans("business"), "businessBtn");
 safeBind(els.topupBtn, "click", () => goPlans("topup10"), "topupBtn");
+safeBind(els.managePlanBtn, "click", () => goPlans(""), "managePlanBtn");
+safeBind(els.backgroundToggleBtn, "click", () => {
+  const nextExpanded = els.backgroundWrap?.classList.contains("hidden");
+  setBackgroundExpanded(nextExpanded);
+  saveLocalState().catch(() => {});
+}, "backgroundToggleBtn");
+safeBind(els.backgroundNote, "input", () => {
+  updateBackgroundMeta();
+  saveLocalState().catch(() => {});
+}, "backgroundNote");
 
-[els.tone, els.recipient, els.senderRole].forEach((el) => {
+[els.tone, els.recipient, els.senderRole, els.harshFilterEnabled].forEach((el) => {
   safeBind(el, "change", saveLocalState, "settingsField");
 });
 
