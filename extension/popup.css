@@ -201,7 +201,7 @@ textarea {
 }
 
 .actions.secondary {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .inline-toggle {
@@ -252,26 +252,39 @@ button.ghost:hover {
   background: #dce6fb;
 }
 
-button.ghost.is-coming-soon {
+.plans-card .sub {
+  margin-bottom: 12px;
+}
+
+.plan-actions-wrap {
   position: relative;
-  opacity: 0.64;
 }
 
-button.ghost.is-coming-soon::after {
-  content: "준비중";
+.plan-preview-overlay {
   position: absolute;
-  top: 5px;
-  right: 8px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #8a4b00;
-  font-size: 10px;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(17, 27, 45, 0.42);
+  color: #fff;
   font-weight: 800;
+  letter-spacing: -0.01em;
+  backdrop-filter: blur(1px);
 }
 
-.plan-action-note {
-  margin-top: 10px;
+.plan-preview-overlay:hover {
+  filter: none;
+  background: rgba(17, 27, 45, 0.46);
+}
+
+.option-row {
+  margin-bottom: 0;
+}
+
+.option-helper {
+  margin-top: 4px;
 }
 
 .status {

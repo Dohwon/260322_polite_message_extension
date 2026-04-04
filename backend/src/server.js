@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env, PLANS, TONES, RECIPIENTS } from "./config.js";
 import {
+  addAdminAllowedIp,
   addBonusRequests,
   addUsage,
   clearUserSession,
@@ -24,11 +25,13 @@ import {
   getTossOrderByOrderId,
   getCurrentMonthlyUsage,
   getUserByEmail,
+  listAdminAllowedIps,
   getUserByGoogleSub,
   getUserBySessionToken,
   linkGoogleAccount,
   listFeedback,
   listRewriteLogs,
+  removeAdminAllowedIp,
   markTossOrderPaid,
   setFreeCredits,
   setUserSession,
@@ -48,6 +51,8 @@ const googleAuthEnabled = Boolean(env.googleClientId && env.googleClientSecret);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const plansLandingPath = path.join(__dirname, "plans-landing.html");
+const adminDashboardPath = path.join(__dirname, "admin-dashboard.html");
+const adminCreditsPath = path.join(__dirname, "admin-credits.html");
 const oauthPendingStates = new Map();
 const oauthDeviceResults = new Map();
 const adminSessions = new Map();
@@ -295,8 +300,11 @@ function usageSummary(user, monthly, freeDailyUsedAccount = 0) {
       freeDailyLimit: dailyLimit,
       freeDailyUsedAccount: safeDailyUsedAccount,
       monthlyRequestsRemaining: monthlyRemaining,
+      monthlyRequestsUsed: Number(monthly.request_count || 0),
+      monthlyRequestsTotal: Number(plan.maxMonthlyRequests || 0) || null,
       isUnlimited,
-      bonusRequestsRemaining: user.bonus_requests_remaining ?? 0
+      bonusRequestsRemaining: Number(user.bonus_requests_remaining || 0),
+      bonusRequestsTotal: Number(user.bonus_requests_total || 0)
     },
     member: {
       isRegistered: Boolean(user.id),
@@ -337,8 +345,14 @@ function getClientIp(req) {
   return normalizeClientIp(req.ip || req.socket?.remoteAddress);
 }
 
+function getConfiguredAdminAllowedIps() {
+  const dbAllowed = listAdminAllowedIps().map((row) => String(row.ip_address || "").trim()).filter(Boolean);
+  if (dbAllowed.length > 0) return dbAllowed;
+  return String(env.adminAllowedIps || "").split(",").map((v) => v.trim()).filter(Boolean);
+}
+
 function isAllowedAdminIp(req) {
-  const allowed = String(env.adminAllowedIps || "").split(",").map((v) => v.trim()).filter(Boolean);
+  const allowed = getConfiguredAdminAllowedIps();
   if (allowed.length === 0) return true;
   const ip = getClientIp(req);
   return Boolean(ip) && allowed.includes(ip);
@@ -647,15 +661,15 @@ app.post("/api/feedback", async (req, res) => {
   if (!FEEDBACK_TOPICS.has(topic)) {
     return res.status(400).json({ error: "문의 주제를 목록에서 선택해 주세요." });
   }
-  if (!message || message.length < 6) {
-    return res.status(400).json({ error: "문의 내용을 6자 이상 입력해 주세요." });
+  if (!message || message.length < 3) {
+    return res.status(400).json({ error: "문의 내용을 3자 이상 입력해 주세요." });
   }
   createFeedback({ email, topic, message });
   try {
     const mail = await notifyFeedbackByEmail({ email, topic, message });
     if (!mail.delivered) {
       return res.status(503).json({
-        error: "문의는 저장되었지만 이메일 전송 설정이 아직 완료되지 않았습니다."
+        error: "문의는 저장되었지만 운영 메일 설정이 아직 완료되지 않았습니다. Gmail 앱 비밀번호(SMTP_PASS)를 먼저 넣어 주세요."
       });
     }
     return res.json({ ok: true, emailDelivered: mail.delivered });
@@ -691,8 +705,8 @@ app.post("/admin/logout", (req, res) => {
   return res.json({ ok: true });
 });
 
-app.get("/admin/dashboard", requireAdminDashboard, (req, res) => {
-  const logs = listRewriteLogs(2000);
+app.get("/admin/dashboard-data", requireAdminDashboard, (req, res) => {
+  const logs = listRewriteLogs(3000);
   const summaryMap = new Map();
   for (const row of logs) {
     const current = summaryMap.get(row.user_email) || { email: row.user_email, count: 0, lastUsedAt: row.created_at };
@@ -700,54 +714,38 @@ app.get("/admin/dashboard", requireAdminDashboard, (req, res) => {
     if (row.created_at > current.lastUsedAt) current.lastUsedAt = row.created_at;
     summaryMap.set(row.user_email, current);
   }
-  const summaryRows = Array.from(summaryMap.values())
-    .sort((a, b) => b.count - a.count || String(b.lastUsedAt).localeCompare(String(a.lastUsedAt)))
-    .map((row) => `<tr><td>${safeHtml(row.email)}</td><td>${row.count}</td><td>${safeHtml(row.lastUsedAt)}</td></tr>`)
-    .join("");
-  const logRows = logs
-    .map((row) => `<tr><td>${safeHtml(row.created_at)}</td><td>${safeHtml(row.user_email)}</td><td>${safeHtml(row.tone)}</td><td>${safeHtml(row.recipient)}</td><td>${safeHtml(row.sender_role)}</td><td>${safeHtml(row.original_text)}</td><td>${safeHtml(row.rewritten_text)}</td></tr>`)
-    .join("");
-  return res.type("html").send(`<!doctype html>
-  <html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Admin Dashboard</title>
-  <style>
-    body{font-family:Pretendard,'Noto Sans KR',sans-serif;margin:0;background:#f6f8fc;color:#1c2433}
-    .wrap{max-width:1280px;margin:0 auto;padding:24px 18px 48px}
-    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-    .card{background:#fff;border:1px solid #d9deea;border-radius:16px;padding:18px;box-shadow:0 20px 40px -30px rgba(16,32,67,.35)}
-    h1,h2{margin:0 0 12px}
-    h1{font-size:28px} h2{font-size:20px}
-    table{width:100%;border-collapse:collapse} th,td{border:1px solid #e3e7f1;padding:8px;vertical-align:top;text-align:left;font-size:12px;line-height:1.55}
-    th{background:#eef3ff} .grid{display:grid;grid-template-columns:1fr;gap:18px;margin-top:18px}
-    button{border:0;border-radius:10px;padding:10px 14px;background:#1f4bb8;color:#fff;font-weight:700;cursor:pointer}
-  </style></head><body>
-  <div class="wrap">
-    <div class="top">
-      <div><h1>관리자 대시보드</h1><div>허용 IP와 비밀번호를 통과한 관리자만 접근 가능합니다.</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button id="feedbackBtn" type="button" style="background:#eef3ff;color:#23438a">고객 문의</button>
-        <button id="creditsBtn" type="button" style="background:#eef3ff;color:#23438a">충전 지급</button>
-        <button id="logoutBtn" type="button">로그아웃</button>
-      </div>
-    </div>
-    <div class="grid">
-      <section class="card"><h2>사용자별 사용 횟수</h2><table><thead><tr><th>이메일</th><th>사용 횟수</th><th>최근 사용 시각</th></tr></thead><tbody>${summaryRows || '<tr><td colspan="3">아직 사용 로그가 없습니다.</td></tr>'}</tbody></table></section>
-      <section class="card"><h2>문장 변환 상세 로그</h2><table><thead><tr><th>시각</th><th>이메일</th><th>분위기</th><th>보내는 대상</th><th>본인 역할</th><th>사용한 문장</th><th>변환한 문장</th></tr></thead><tbody>${logRows || '<tr><td colspan="7">아직 로그가 없습니다.</td></tr>'}</tbody></table></section>
-    </div>
-  </div>
-  <script>
-    document.getElementById("feedbackBtn").addEventListener("click", () => {
-      location.href = "/admin/feedback";
-    });
-    document.getElementById("creditsBtn").addEventListener("click", () => {
-      location.href = "/admin/credits";
-    });
-    document.getElementById("logoutBtn").addEventListener("click", async () => {
-      await fetch("/admin/logout", { method: "POST" });
-      location.href = "/billing/plans";
-    });
-  </script></body></html>`);
+  const summaryRows = Array.from(summaryMap.values()).sort((a, b) => b.count - a.count || String(b.lastUsedAt).localeCompare(String(a.lastUsedAt)));
+  return res.json({
+    ok: true,
+    currentIp: getClientIp(req) || "",
+    allowedIps: getConfiguredAdminAllowedIps(),
+    summaryRows,
+    logRows: logs
+  });
 });
+
+app.post("/admin/allowed-ips", requireAdminDashboard, (req, res) => {
+  const ipAddress = normalizeClientIp(req.body?.ipAddress || "");
+  if (!ipAddress) {
+    return res.status(400).json({ error: "유효한 IP를 입력해 주세요." });
+  }
+  const allowedIps = addAdminAllowedIp(ipAddress).map((row) => row.ip_address);
+  return res.json({ ok: true, allowedIps });
+});
+
+app.delete("/admin/allowed-ips", requireAdminDashboard, (req, res) => {
+  const ipAddress = normalizeClientIp(req.body?.ipAddress || "");
+  if (!ipAddress) {
+    return res.status(400).json({ error: "삭제할 IP가 필요합니다." });
+  }
+  const allowedIps = removeAdminAllowedIp(ipAddress).map((row) => row.ip_address);
+  return res.json({ ok: true, allowedIps });
+});
+
+app.get("/admin/dashboard", requireAdminDashboard, (_req, res) => {
+  return res.sendFile(adminDashboardPath);
+});
+
 app.get("/admin/feedback", requireAdminDashboard, (req, res) => {
   const rows = listFeedback(500);
   const items = rows
@@ -768,7 +766,9 @@ app.get("/admin/feedback", requireAdminDashboard, (req, res) => {
   table{width:100%;border-collapse:collapse}
   th,td{border:1px solid #d9deea;padding:8px;vertical-align:top;text-align:left;font-size:13px}
   th{background:#f3f6ff}
+  button{border:0;border-radius:10px;padding:10px 14px;background:#eef3ff;color:#23438a;font-weight:700;cursor:pointer;margin-bottom:16px}
   </style></head><body>
+  <button onclick="location.href='/admin/dashboard'">대시보드로</button>
   <h1>고객 문의 게시판(관리자용)</h1>
   <p>총 ${rows.length}건</p>
   <table><thead><tr><th>접수시각</th><th>이메일</th><th>주제</th><th>내용</th></tr></thead><tbody>${items}</tbody></table>
@@ -789,54 +789,18 @@ app.post("/admin/credits/grant", requireAdminDashboard, (req, res) => {
     return res.status(404).json({ error: "해당 이메일 사용자를 찾을 수 없습니다." });
   }
   const updated = addBonusRequests(user.id, amount);
+  const monthly = getCurrentMonthlyUsage(updated.id);
+  const freeDaily = getFreeDailyUsage(updated.id);
   return res.json({
     ok: true,
     email: updated.email,
-    bonusRequestsRemaining: updated.bonus_requests_remaining
+    planId: pickPlan(updated.plan_id).id,
+    usage: usageSummary(updated, monthly, freeDaily?.used_count || 0).usage
   });
 });
 
-app.get("/admin/credits", requireAdminDashboard, (req, res) => {
-  return res.type("html").send(`<!doctype html>
-  <html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Credits Admin</title>
-  <style>
-    body{font-family:Pretendard,'Noto Sans KR',sans-serif;max-width:760px;margin:32px auto;padding:0 16px;color:#1f2433}
-    .card{border:1px solid #d9deea;border-radius:12px;padding:16px;background:#fff}
-    label{display:block;margin:10px 0 6px;font-weight:600;font-size:13px}
-    input,button{width:100%;padding:10px;border-radius:10px;font:inherit}
-    input{border:1px solid #ccd5ea}
-    button{border:0;background:#1b4acc;color:#fff;font-weight:700;cursor:pointer;margin-top:12px}
-    #status{margin-top:10px;font-size:13px}
-  </style></head><body>
-  <h1>관리자 충전 패널</h1>
-  <div class="card">
-    <label>사용자 이메일</label><input id="email" placeholder="user@example.com"/>
-    <label>지급 횟수</label><input id="amount" type="number" value="10" min="1" max="1000"/>
-    <button id="grantBtn">+충전 지급</button>
-    <div id="status"></div>
-  </div>
-  <script>
-    const key = new URLSearchParams(location.search).get("key") || "";
-    const statusEl = document.getElementById("status");
-    document.getElementById("grantBtn").addEventListener("click", async () => {
-      statusEl.textContent = "처리 중...";
-      try {
-        const email = document.getElementById("email").value.trim();
-        const amount = Number(document.getElementById("amount").value || 10);
-        const res = await fetch("/admin/credits/grant?key=" + encodeURIComponent(key), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, amount })
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "지급 실패");
-        statusEl.textContent = email + " 계정에 지급 완료. 현재 보너스: " + json.bonusRequestsRemaining + "회";
-      } catch (e) {
-        statusEl.textContent = String(e.message || e);
-      }
-    });
-  </script></body></html>`);
+app.get("/admin/credits", requireAdminDashboard, (_req, res) => {
+  return res.sendFile(adminCreditsPath);
 });
 
 app.post("/admin/test/bootstrap-user", (req, res) => {

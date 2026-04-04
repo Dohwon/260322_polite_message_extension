@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   stripe_subscription_id TEXT,
   subscription_status TEXT,
   bonus_requests_remaining INTEGER NOT NULL DEFAULT 0,
+  bonus_requests_total INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -113,6 +114,12 @@ CREATE TABLE IF NOT EXISTS free_ip_daily_usage (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(ip_hash, date_key)
 );
+
+CREATE TABLE IF NOT EXISTS admin_allowed_ips (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip_address TEXT UNIQUE NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `);
 
 function safeAddColumn(sql) {
@@ -134,6 +141,7 @@ safeAddColumn(`ALTER TABLE users ADD COLUMN auth_provider TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN google_sub TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN google_name TEXT`);
 safeAddColumn(`ALTER TABLE users ADD COLUMN google_picture TEXT`);
+safeAddColumn(`ALTER TABLE users ADD COLUMN bonus_requests_total INTEGER NOT NULL DEFAULT 0`);
 
 const insertUserStmt = db.prepare(`
   INSERT INTO users (email, api_key)
@@ -182,6 +190,7 @@ const decBonusStmt = db.prepare(`
 const addBonusStmt = db.prepare(`
   UPDATE users
   SET bonus_requests_remaining = bonus_requests_remaining + ?,
+      bonus_requests_total = bonus_requests_total + ?,
       updated_at = CURRENT_TIMESTAMP
   WHERE id = ?
 `);
@@ -272,6 +281,20 @@ const listRewriteLogsStmt = db.prepare(`
   FROM rewrite_logs
   ORDER BY id DESC
   LIMIT ?
+`);
+const listAdminAllowedIpsStmt = db.prepare(`
+  SELECT ip_address, created_at
+  FROM admin_allowed_ips
+  ORDER BY id ASC
+`);
+const insertAdminAllowedIpStmt = db.prepare(`
+  INSERT INTO admin_allowed_ips (ip_address)
+  VALUES (?)
+  ON CONFLICT(ip_address) DO NOTHING
+`);
+const deleteAdminAllowedIpStmt = db.prepare(`
+  DELETE FROM admin_allowed_ips
+  WHERE ip_address = ?
 `);
 const upsertFreeIpUsageStmt = db.prepare(`
   INSERT INTO free_ip_usage (ip_hash)
@@ -372,6 +395,12 @@ const upliftLegacyFreeCreditsStmt = db.prepare(`
       updated_at = CURRENT_TIMESTAMP
   WHERE plan_id = 'free' AND free_credits_remaining < 5
 `);
+const normalizeBonusTotalsStmt = db.prepare(`
+  UPDATE users
+  SET bonus_requests_total = bonus_requests_remaining,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE bonus_requests_total < bonus_requests_remaining
+`);
 
 function createApiKey() {
   return `pm_${crypto.randomBytes(20).toString("hex")}`;
@@ -394,6 +423,7 @@ function dayKeyKst(date = new Date()) {
 
 normalizeLegacyFreeCreditsStmt.run();
 upliftLegacyFreeCreditsStmt.run();
+normalizeBonusTotalsStmt.run();
 
 export function createOrGetUser(email) {
   const normalized = String(email || "").trim().toLowerCase();
@@ -454,7 +484,8 @@ export function consumeBonusRequest(userId) {
 }
 
 export function addBonusRequests(userId, amount) {
-  addBonusStmt.run(amount, userId);
+  const safeAmount = Number(amount) || 0;
+  addBonusStmt.run(safeAmount, safeAmount, userId);
   return getUserByIdStmt.get(userId);
 }
 
@@ -598,4 +629,22 @@ export function createRewriteLog({ userId, userEmail, originalText, rewrittenTex
 
 export function listRewriteLogs(limit = 500) {
   return listRewriteLogsStmt.all(Number(limit) || 500);
+}
+
+export function listAdminAllowedIps() {
+  return listAdminAllowedIpsStmt.all();
+}
+
+export function addAdminAllowedIp(ipAddress) {
+  const safeIp = String(ipAddress || '').trim();
+  if (!safeIp) return listAdminAllowedIps();
+  insertAdminAllowedIpStmt.run(safeIp);
+  return listAdminAllowedIps();
+}
+
+export function removeAdminAllowedIp(ipAddress) {
+  const safeIp = String(ipAddress || '').trim();
+  if (!safeIp) return listAdminAllowedIps();
+  deleteAdminAllowedIpStmt.run(safeIp);
+  return listAdminAllowedIps();
 }

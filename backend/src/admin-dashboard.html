@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Dashboard</title>
+  <style>
+    body{font-family:Pretendard,'Noto Sans KR',sans-serif;margin:0;background:#f6f8fc;color:#1c2433}
+    .wrap{max-width:1320px;margin:0 auto;padding:24px 18px 48px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .top-actions,.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .card{background:#fff;border:1px solid #d9deea;border-radius:16px;padding:18px;box-shadow:0 20px 40px -30px rgba(16,32,67,.35)}
+    h1,h2{margin:0 0 12px} h1{font-size:28px} h2{font-size:20px}
+    .grid{display:grid;grid-template-columns:1fr;gap:18px;margin-top:18px}
+    input,select,button{font:inherit}
+    input,select{border:1px solid #cfd8ec;border-radius:10px;padding:10px 12px;background:#fff}
+    button{border:0;border-radius:10px;padding:10px 14px;background:#1f4bb8;color:#fff;font-weight:700;cursor:pointer}
+    button.ghost{background:#eef3ff;color:#23438a}
+    .muted{color:#5c6d87;font-size:13px}
+    .chip{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#eef3ff;color:#23438a;font-size:12px;font-weight:700}
+    .toolbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+    .toolbar .inline input,.toolbar .inline select{min-width:140px}
+    table{width:100%;border-collapse:collapse} th,td{border:1px solid #e3e7f1;padding:8px;vertical-align:top;text-align:left;font-size:12px;line-height:1.55}
+    th{background:#eef3ff}
+    .ip-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .ip-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;background:#f3f6ff;color:#27406f;font-size:12px;font-weight:600}
+    .ip-item button{padding:4px 8px;border-radius:999px;background:#dfe7ff;color:#23438a;font-size:11px}
+    .empty{padding:18px;color:#66758f;font-size:13px;text-align:center}
+    .count-sort{display:inline-flex;gap:4px;vertical-align:middle;margin-left:6px}
+    .count-sort button{padding:4px 7px;border-radius:8px;background:#dfe7ff;color:#23438a;font-size:11px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>관리자 대시보드</h1>
+        <div class="muted">15초마다 자동 갱신됩니다. 수동 새로고침도 가능합니다.</div>
+      </div>
+      <div class="top-actions">
+        <button id="feedbackBtn" type="button" class="ghost">고객 문의</button>
+        <button id="creditsBtn" type="button" class="ghost">충전 지급</button>
+        <button id="refreshBtn" type="button" class="ghost">새로고침</button>
+        <button id="logoutBtn" type="button">로그아웃</button>
+      </div>
+    </div>
+    <div class="grid">
+      <section class="card">
+        <div class="toolbar">
+          <div>
+            <h2>허용 IP 설정</h2>
+            <div class="muted">IP가 하나라도 등록되면 그 주소에서만 관리자 로그인과 대시보드 접근이 가능합니다.</div>
+          </div>
+          <div class="chip" id="currentIpChip">현재 IP 확인 중</div>
+        </div>
+        <div class="inline">
+          <input id="ipInput" placeholder="예: 203.0.113.10" />
+          <button id="addIpBtn" type="button">IP 추가</button>
+          <button id="addCurrentIpBtn" type="button" class="ghost">현재 IP 추가</button>
+        </div>
+        <div id="ipNotice" class="muted" style="margin-top:10px"></div>
+        <div id="ipList" class="ip-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="toolbar">
+          <div>
+            <h2>사용자별 사용 횟수</h2>
+            <div class="muted">이메일 또는 사용 횟수로 검색할 수 있습니다.</div>
+          </div>
+          <div class="inline">
+            <input id="summarySearch" placeholder="이메일 / 사용 횟수 검색" />
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>이메일</th>
+              <th>사용 횟수 <span class="count-sort"><button id="countAscBtn" type="button">▲</button><button id="countDescBtn" type="button">▼</button></span></th>
+              <th>최근 사용 시각</th>
+            </tr>
+          </thead>
+          <tbody id="summaryTbody"></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <div class="toolbar">
+          <div>
+            <h2>문장 변환 상세 로그</h2>
+            <div class="muted">이메일, 분위기, 보내는 대상, 본인 역할 기준으로 검색/정렬할 수 있습니다.</div>
+          </div>
+          <div class="inline">
+            <input id="logSearch" placeholder="이메일 / 분위기 / 대상 / 역할 검색" />
+            <select id="logSortField">
+              <option value="created_at">시각</option>
+              <option value="user_email">이메일</option>
+              <option value="tone">분위기</option>
+              <option value="recipient">보내는 대상</option>
+              <option value="sender_role">본인 역할</option>
+            </select>
+            <select id="logSortDir">
+              <option value="desc">내림차순</option>
+              <option value="asc">오름차순</option>
+            </select>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>시각</th><th>이메일</th><th>분위기</th><th>보내는 대상</th><th>본인 역할</th><th>사용한 문장</th><th>변환한 문장</th></tr>
+          </thead>
+          <tbody id="logTbody"></tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+  <script>
+    const state = { data: { allowedIps: [], summaryRows: [], logRows: [], currentIp: "" }, summarySort: "desc" };
+    const els = {
+      currentIpChip: document.getElementById("currentIpChip"),
+      ipInput: document.getElementById("ipInput"),
+      ipNotice: document.getElementById("ipNotice"),
+      ipList: document.getElementById("ipList"),
+      summarySearch: document.getElementById("summarySearch"),
+      summaryTbody: document.getElementById("summaryTbody"),
+      logSearch: document.getElementById("logSearch"),
+      logSortField: document.getElementById("logSortField"),
+      logSortDir: document.getElementById("logSortDir"),
+      logTbody: document.getElementById("logTbody")
+    };
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function renderAllowedIps() {
+      els.currentIpChip.textContent = state.data.currentIp ? `현재 IP ${state.data.currentIp}` : "현재 IP 확인 불가";
+      if (!state.data.allowedIps.length) {
+        els.ipList.innerHTML = '<div class="empty">아직 등록된 허용 IP가 없습니다. 지금 접속 중인 IP를 추가하면 그 주소만 관리자 접근이 가능해집니다.</div>';
+        return;
+      }
+      els.ipList.innerHTML = state.data.allowedIps.map((ip) => `
+        <div class="ip-item">
+          <span>${escapeHtml(ip)}</span>
+          <button type="button" data-remove-ip="${escapeHtml(ip)}">삭제</button>
+        </div>
+      `).join("");
+      els.ipList.querySelectorAll("[data-remove-ip]").forEach((button) => {
+        button.addEventListener("click", () => removeIp(button.getAttribute("data-remove-ip") || ""));
+      });
+    }
+
+    function renderSummary() {
+      const query = (els.summarySearch.value || "").trim().toLowerCase();
+      let rows = [...state.data.summaryRows];
+      if (query) {
+        rows = rows.filter((row) => String(row.email || "").toLowerCase().includes(query) || String(row.count || "").includes(query));
+      }
+      rows.sort((a, b) => state.summarySort === "asc"
+        ? Number(a.count || 0) - Number(b.count || 0) || String(a.email || "").localeCompare(String(b.email || ""))
+        : Number(b.count || 0) - Number(a.count || 0) || String(a.email || "").localeCompare(String(b.email || "")));
+      els.summaryTbody.innerHTML = rows.length
+        ? rows.map((row) => `<tr><td>${escapeHtml(row.email)}</td><td>${row.count}</td><td>${escapeHtml(row.lastUsedAt)}</td></tr>`).join("")
+        : '<tr><td colspan="3" class="empty">조건에 맞는 사용 기록이 없습니다.</td></tr>';
+    }
+
+    function renderLogs() {
+      const query = (els.logSearch.value || "").trim().toLowerCase();
+      const field = els.logSortField.value;
+      const dir = els.logSortDir.value;
+      let rows = [...state.data.logRows];
+      if (query) {
+        rows = rows.filter((row) => [row.user_email, row.tone, row.recipient, row.sender_role, row.original_text, row.rewritten_text]
+          .some((value) => String(value || "").toLowerCase().includes(query)));
+      }
+      rows.sort((a, b) => {
+        const left = String(a[field] || "").toLowerCase();
+        const right = String(b[field] || "").toLowerCase();
+        const cmp = left.localeCompare(right, "ko");
+        return dir === "asc" ? cmp : -cmp;
+      });
+      els.logTbody.innerHTML = rows.length
+        ? rows.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.created_at)}</td>
+              <td>${escapeHtml(row.user_email)}</td>
+              <td>${escapeHtml(row.tone)}</td>
+              <td>${escapeHtml(row.recipient)}</td>
+              <td>${escapeHtml(row.sender_role)}</td>
+              <td>${escapeHtml(row.original_text)}</td>
+              <td>${escapeHtml(row.rewritten_text)}</td>
+            </tr>`).join("")
+        : '<tr><td colspan="7" class="empty">조건에 맞는 변환 로그가 없습니다.</td></tr>';
+    }
+
+    function renderAll() {
+      renderAllowedIps();
+      renderSummary();
+      renderLogs();
+    }
+
+    async function loadData() {
+      const res = await fetch('/admin/dashboard-data');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || '대시보드 로딩 실패');
+      state.data = json;
+      renderAll();
+    }
+
+    async function addIp(ipAddress) {
+      const safeIp = String(ipAddress || '').trim();
+      if (!safeIp) {
+        els.ipNotice.textContent = '추가할 IP를 입력해 주세요.';
+        return;
+      }
+      const res = await fetch('/admin/allowed-ips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ipAddress: safeIp })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'IP 추가 실패');
+      state.data.allowedIps = json.allowedIps || [];
+      els.ipInput.value = '';
+      els.ipNotice.textContent = `${safeIp} 를 허용 IP에 추가했습니다.`;
+      renderAllowedIps();
+    }
+
+    async function removeIp(ipAddress) {
+      const res = await fetch('/admin/allowed-ips', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ipAddress })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'IP 삭제 실패');
+      state.data.allowedIps = json.allowedIps || [];
+      els.ipNotice.textContent = `${ipAddress} 를 허용 IP에서 제거했습니다.`;
+      renderAllowedIps();
+    }
+
+    document.getElementById('feedbackBtn').addEventListener('click', () => { location.href = '/admin/feedback'; });
+    document.getElementById('creditsBtn').addEventListener('click', () => { location.href = '/admin/credits'; });
+    document.getElementById('refreshBtn').addEventListener('click', () => { loadData().catch((err) => { els.ipNotice.textContent = String(err.message || err); }); });
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/admin/logout', { method: 'POST' });
+      location.href = '/billing/plans';
+    });
+    document.getElementById('addIpBtn').addEventListener('click', () => { addIp(els.ipInput.value).catch((err) => { els.ipNotice.textContent = String(err.message || err); }); });
+    document.getElementById('addCurrentIpBtn').addEventListener('click', () => { addIp(state.data.currentIp).catch((err) => { els.ipNotice.textContent = String(err.message || err); }); });
+    document.getElementById('countAscBtn').addEventListener('click', () => { state.summarySort = 'asc'; renderSummary(); });
+    document.getElementById('countDescBtn').addEventListener('click', () => { state.summarySort = 'desc'; renderSummary(); });
+    els.summarySearch.addEventListener('input', renderSummary);
+    els.logSearch.addEventListener('input', renderLogs);
+    els.logSortField.addEventListener('change', renderLogs);
+    els.logSortDir.addEventListener('change', renderLogs);
+
+    loadData().catch((err) => { els.ipNotice.textContent = String(err.message || err); });
+    setInterval(() => { loadData().catch(() => {}); }, 15000);
+  </script>
+</body>
+</html>

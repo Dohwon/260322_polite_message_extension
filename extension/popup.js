@@ -23,6 +23,8 @@ const els = {
   plansInfoBtn: document.getElementById("plansInfoBtn"),
   planSummary: document.getElementById("planSummary"),
   managePlanBtn: document.getElementById("managePlanBtn"),
+  topupBtn: document.getElementById("topupBtn"),
+  planPreviewOverlayBtn: document.getElementById("planPreviewOverlayBtn"),
   tone: document.getElementById("tone"),
   recipient: document.getElementById("recipient"),
   senderRole: document.getElementById("senderRole"),
@@ -37,7 +39,6 @@ const els = {
   rewriteBtn: document.getElementById("rewriteBtn"),
   resetBtn: document.getElementById("resetBtn"),
   copyBtn: document.getElementById("copyBtn"),
-  topupBtn: document.getElementById("topupBtn"),
   status: document.getElementById("status")
 };
 
@@ -135,19 +136,34 @@ function setBackgroundExpanded(expanded) {
 function usageText(user) {
   if (!user?.usage || !user?.limits) return "";
 
+  const parts = [];
+  const dailyTotal = Number(user.usage.freeCreditsTotal || user.limits.dailyRequestLimit || 0);
+  const dailyUsed = Number(user.usage.freeDailyUsedAccount || 0);
+  const monthlyUsed = Number(user.usage.monthlyRequestsUsed || user.usage.requestCount || 0);
+  const monthlyTotal = Number(user.usage.monthlyRequestsTotal || user.limits.maxMonthlyRequests || 0);
+  const bonusRemaining = Number(user.usage.bonusRequestsRemaining || 0);
+  const bonusTotal = Number(user.usage.bonusRequestsTotal || 0);
+
   if (user.planId === "free") {
-    const dailyRemaining = Number(user.usage.freeCreditsRemaining || 0);
-    const dailyTotal = Number(user.usage.freeCreditsTotal || 0);
-    const monthlyRemaining = remainingMonthlyCount(user);
-    if (monthlyRemaining === null) {
-      return `일일 무료 ${dailyRemaining}/${dailyTotal}회 남음`;
+    if (dailyTotal > 0) {
+      parts.push(`일일 무료 ${Math.max(0, dailyTotal - dailyUsed)}/${dailyTotal}회 남음`);
     }
-    return `일일 무료 ${dailyRemaining}/${dailyTotal}회 남음 · 이번 달 ${monthlyRemaining}회 남음`;
+  } else if (Number.isFinite(user.limits.dailyRequestLimit) && user.limits.dailyRequestLimit !== null) {
+    const proDailyTotal = Number(user.limits.dailyRequestLimit || 0);
+    if (proDailyTotal > 0) {
+      parts.push(`오늘 ${dailyUsed}/${proDailyTotal}회 사용`);
+    }
   }
 
-  const monthlyRemaining = remainingMonthlyCount(user);
-  const bonus = Number(user.usage.bonusRequestsRemaining || 0);
-  return `${user.planName} · 이번 달 ${monthlyRemaining}회 남음${bonus > 0 ? ` · 추가 ${bonus}회` : ""}`;
+  if (monthlyTotal > 0) {
+    parts.push(`이번달 ${monthlyUsed}/${monthlyTotal}회 소진`);
+  }
+
+  if (bonusTotal > 0) {
+    parts.push(`추가 지급 ${bonusRemaining}/${bonusTotal}회 사용중`);
+  }
+
+  return parts.join(", ");
 }
 
 function authHeaders() {
@@ -170,8 +186,8 @@ function updateAuthUI() {
     els.logoutBtn.classList.toggle("hidden", !isLoggedIn);
   }
   if (els.rewriteBtn) els.rewriteBtn.disabled = !isLoggedIn;
-  if (els.topupBtn) els.topupBtn.disabled = false;
-  if (els.managePlanBtn) els.managePlanBtn.disabled = false;
+  if (els.topupBtn) els.topupBtn.disabled = true;
+  if (els.managePlanBtn) els.managePlanBtn.disabled = true;
 
   if (!isLoggedIn) {
     if (els.accountSummary) {
@@ -180,7 +196,7 @@ function updateAuthUI() {
     if (els.planSummary) {
       els.planSummary.textContent = loginPending
         ? "Google 로그인 확인 중입니다..."
-        : "요금제 변경 버튼에서 정책을 확인할 수 있습니다.";
+        : "로그인하면 현재 플랜과 사용 현황을 확인할 수 있습니다.";
     }
     return;
   }
@@ -195,7 +211,7 @@ function updateAuthUI() {
     } else if (state.user.planId === "pro") {
       els.planSummary.textContent = "프로 플랜 사용자입니다.";
     } else {
-      els.planSummary.textContent = "3회 무료 사용 계정입니다.";
+      els.planSummary.textContent = "무료 사용 계정입니다.";
     }
   }
 }
@@ -408,7 +424,6 @@ async function loginWithGoogle() {
     const loginUrl = `${state.apiBaseUrl}/api/auth/google/start?deviceId=${encodeURIComponent(deviceId)}`;
     await chrome.tabs.create({ url: loginUrl });
 
-    // popup이 살아있는 동안은 바로 polling 시작
     pollGoogleLogin(deviceId).catch((err) => {
       setAuthStatus(normalizeFetchError(err), "error");
       setStatus(normalizeFetchError(err), "error");
@@ -554,39 +569,35 @@ safeBind(els.rewriteBtn, "click", rewrite, "rewriteBtn");
 safeBind(els.resetBtn, "click", resetDraft, "resetBtn");
 safeBind(els.copyBtn, "click", copyResult, "copyBtn");
 safeBind(els.plansInfoBtn, "click", () => goPlans(""), "plansInfoBtn");
-safeBind(els.topupBtn, "click", () => {
-  setStatus("유료 기능은 준비중입니다. 정책 페이지에서 내용을 먼저 확인해 주세요.", "warning");
-  goPlans("topup10");
+safeBind(els.planPreviewOverlayBtn, "click", () => goPlans(""), "planPreviewOverlayBtn");
+safeBind(els.topupBtn, "click", (event) => {
+  event.preventDefault();
 }, "topupBtn");
-safeBind(els.managePlanBtn, "click", () => {
-  setStatus("유료 기능은 준비중입니다. 정책 페이지에서 내용을 먼저 확인해 주세요.", "warning");
-  goPlans("");
+safeBind(els.managePlanBtn, "click", (event) => {
+  event.preventDefault();
 }, "managePlanBtn");
 safeBind(els.backgroundToggleBtn, "click", () => {
-  const nextExpanded = els.backgroundWrap?.classList.contains("hidden");
-  setBackgroundExpanded(nextExpanded);
+  const next = els.backgroundWrap?.classList.contains("hidden");
+  setBackgroundExpanded(Boolean(next));
   saveLocalState().catch(() => {});
 }, "backgroundToggleBtn");
 safeBind(els.backgroundNote, "input", () => {
   updateBackgroundMeta();
   saveLocalState().catch(() => {});
 }, "backgroundNote");
+safeBind(els.tone, "change", () => saveLocalState().catch(() => {}), "tone");
+safeBind(els.recipient, "change", () => saveLocalState().catch(() => {}), "recipient");
+safeBind(els.senderRole, "input", () => saveLocalState().catch(() => {}), "senderRole");
+safeBind(els.harshFilterEnabled, "change", () => saveLocalState().catch(() => {}), "harshFilterEnabled");
 
-[els.tone, els.recipient, els.senderRole, els.harshFilterEnabled].forEach((el) => {
-  safeBind(el, "change", saveLocalState, "settingsField");
-});
-
-(async () => {
-  try {
-    const local = await loadLocalState();
-    updateAuthUI();
+(async function init() {
+  const { pendingGoogleDeviceId, pendingGoogleStartedAt } = await loadLocalState();
+  updateAuthUI();
+  if (state.sessionToken) {
     await refreshSession();
-    await resumePendingGoogleLoginIfExists(
-      local.pendingGoogleDeviceId,
-      local.pendingGoogleStartedAt
-    );
-    validateOriginalText();
-  } catch (err) {
-    setStatus(`초기화 오류: ${err?.message || "unknown"}`, "error");
+  } else {
+    setStatus("Google 로그인 후 사용할 수 있습니다.");
   }
+  validateOriginalText();
+  await resumePendingGoogleLoginIfExists(pendingGoogleDeviceId, pendingGoogleStartedAt);
 })();

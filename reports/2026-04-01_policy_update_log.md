@@ -68,3 +68,5 @@
 - recurring billing / cancel-at-period-end semantics are policy-level only unless final PG strategy is chosen
 
 [2026-04-05] free-10/admin-dashboard/gmail-support/coming-soon-ui aligned cards and buttons
+
+[2026-04-05] landing overlay/admin ip dashboard/popup preview overlay/admin usage split/status text updated

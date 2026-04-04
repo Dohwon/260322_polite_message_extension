@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Credits Admin</title>
+  <style>
+    body{font-family:Pretendard,'Noto Sans KR',sans-serif;max-width:760px;margin:32px auto;padding:0 16px;color:#1f2433}
+    .card{border:1px solid #d9deea;border-radius:12px;padding:16px;background:#fff}
+    label{display:block;margin:10px 0 6px;font-weight:600;font-size:13px}
+    input,button{width:100%;padding:10px;border-radius:10px;font:inherit}
+    input{border:1px solid #ccd5ea}
+    button{border:0;background:#1b4acc;color:#fff;font-weight:700;cursor:pointer;margin-top:12px}
+    .ghost{background:#eef3ff;color:#23438a;margin-bottom:16px}
+    #status{margin-top:10px;font-size:13px;line-height:1.6}
+  </style>
+</head>
+<body>
+  <button class="ghost" onclick="location.href='/admin/dashboard'">대시보드로</button>
+  <h1>관리자 충전 패널</h1>
+  <div class="card">
+    <label>사용자 이메일</label><input id="email" placeholder="user@example.com"/>
+    <label>지급 횟수</label><input id="amount" type="number" value="10" min="1" max="1000"/>
+    <button id="grantBtn">+충전 지급</button>
+    <div id="status"></div>
+  </div>
+  <script>
+    const statusEl = document.getElementById('status');
+    function formatUsage(usage, planId) {
+      if (!usage) return '';
+      const parts = [];
+      if (planId === 'free') {
+        parts.push(`일일 무료 ${Number(usage.freeDailyUsedAccount || 0)}/${Number(usage.freeCreditsTotal || 0)}회`);
+      } else if (Number.isFinite(Number(usage.freeDailyLimit))) {
+        parts.push(`오늘 ${Number(usage.freeDailyUsedAccount || 0)}/${Number(usage.freeDailyLimit || 0)}회 사용`);
+      }
+      if (Number.isFinite(Number(usage.monthlyRequestsTotal))) {
+        parts.push(`이번달 ${Number(usage.monthlyRequestsUsed || 0)}/${Number(usage.monthlyRequestsTotal || 0)}회 소진`);
+      }
+      if (Number(usage.bonusRequestsTotal || 0) > 0) {
+        parts.push(`추가 지급 ${Number(usage.bonusRequestsRemaining || 0)}/${Number(usage.bonusRequestsTotal || 0)}회 사용중`);
+      }
+      return parts.join(', ');
+    }
+    document.getElementById('grantBtn').addEventListener('click', async () => {
+      statusEl.textContent = '처리 중...';
+      try {
+        const email = document.getElementById('email').value.trim();
+        const amount = Number(document.getElementById('amount').value || 10);
+        const res = await fetch('/admin/credits/grant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, amount })
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || '지급 실패');
+        statusEl.textContent = `${json.email} 계정에 지급 완료. ${formatUsage(json.usage, json.planId)}`;
+      } catch (e) {
+        statusEl.textContent = String(e.message || e);
+      }
+    });
+  </script>
+</body>
+</html>
