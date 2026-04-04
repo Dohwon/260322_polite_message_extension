@@ -43,6 +43,11 @@
     .reply-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .reply-submit{border:0;border-radius:10px;padding:10px 14px;background:#1f4bb8;color:#fff;font-weight:700;cursor:pointer}
     .reply-status{font-size:12px;color:#5c6d87;min-height:16px}
+    .pager{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .pager-meta{color:#5c6d87;font-size:12px}
+    .pager-actions{display:flex;gap:8px;align-items:center}
+    .pager-btn{border:1px solid #d7e0f3;border-radius:10px;padding:8px 12px;background:#fff;color:#23438a;font-weight:700;cursor:pointer}
+    .pager-btn:disabled{opacity:.45;cursor:not-allowed}
     .empty{padding:18px;color:#66758f;font-size:13px;text-align:center}
     @media (max-width: 980px){ .layout{grid-template-columns:1fr} }
   </style>
@@ -93,6 +98,13 @@
           </thead>
           <tbody id="listBody"></tbody>
         </table>
+        <div class="pager">
+          <div id="pagerMeta" class="pager-meta"></div>
+          <div class="pager-actions">
+            <button id="prevPageBtn" type="button" class="pager-btn">이전</button>
+            <button id="nextPageBtn" type="button" class="pager-btn">다음</button>
+          </div>
+        </div>
       </section>
 
       <section class="card">
@@ -103,14 +115,18 @@
   </div>
 
   <script>
-    const state = { topics: [], items: [], activeTopic: 'all', filter: 'all', selectedId: null };
+    const PAGE_SIZE = 20;
+    const state = { topics: [], items: [], activeTopic: 'all', filter: 'all', selectedId: null, currentPage: 1 };
     const els = {
       summaryMeta: document.getElementById('summaryMeta'),
       tabs: document.getElementById('tabs'),
       replyFilter: document.getElementById('replyFilter'),
       searchInput: document.getElementById('searchInput'),
       listBody: document.getElementById('listBody'),
-      detailRoot: document.getElementById('detailRoot')
+      detailRoot: document.getElementById('detailRoot'),
+      pagerMeta: document.getElementById('pagerMeta'),
+      prevPageBtn: document.getElementById('prevPageBtn'),
+      nextPageBtn: document.getElementById('nextPageBtn')
     };
 
     function escapeHtml(value) {
@@ -141,6 +157,7 @@
       els.tabs.querySelectorAll('[data-topic]').forEach((button) => {
         button.addEventListener('click', () => {
           state.activeTopic = button.getAttribute('data-topic') || 'all';
+          state.currentPage = 1;
           state.selectedId = null;
           renderList();
           renderTabs();
@@ -149,10 +166,27 @@
       });
     }
 
+    function pagedItems(rows) {
+      const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+      state.currentPage = Math.min(Math.max(1, state.currentPage), totalPages);
+      const start = (state.currentPage - 1) * PAGE_SIZE;
+      return {
+        totalPages,
+        start,
+        rows: rows.slice(start, start + PAGE_SIZE)
+      };
+    }
+
     function renderList() {
       const rows = filteredItems();
+      const { rows: visibleRows, start, totalPages } = pagedItems(rows);
       els.summaryMeta.textContent = `총 ${state.items.length}건 · 현재 ${rows.length}건 표시 중`;
-      els.listBody.innerHTML = rows.length ? rows.map((item) => `
+      els.pagerMeta.textContent = rows.length
+        ? `${start + 1}-${Math.min(start + visibleRows.length, rows.length)} / ${rows.length} · ${state.currentPage}/${totalPages} 페이지`
+        : '0건';
+      els.prevPageBtn.disabled = state.currentPage <= 1;
+      els.nextPageBtn.disabled = state.currentPage >= totalPages;
+      els.listBody.innerHTML = visibleRows.length ? visibleRows.map((item) => `
         <tr>
           <td>${escapeHtml(item.topic)}</td>
           <td>${escapeHtml(item.email)}</td>
@@ -239,11 +273,26 @@
 
     els.replyFilter.addEventListener('change', () => {
       state.filter = els.replyFilter.value;
+      state.currentPage = 1;
       state.selectedId = null;
       renderList();
       renderDetail();
     });
     els.searchInput.addEventListener('input', () => {
+      state.currentPage = 1;
+      state.selectedId = null;
+      renderList();
+      renderDetail();
+    });
+    els.prevPageBtn.addEventListener('click', () => {
+      if (state.currentPage <= 1) return;
+      state.currentPage -= 1;
+      state.selectedId = null;
+      renderList();
+      renderDetail();
+    });
+    els.nextPageBtn.addEventListener('click', () => {
+      state.currentPage += 1;
       state.selectedId = null;
       renderList();
       renderDetail();
