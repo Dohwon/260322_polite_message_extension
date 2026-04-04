@@ -14,6 +14,7 @@
     .grid{display:grid;grid-template-columns:1fr;gap:18px;margin-top:18px}
     input,select,button{font:inherit}
     input,select{border:1px solid #cfd8ec;border-radius:10px;padding:10px 12px;background:#fff}
+    input::placeholder{color:#a7b3c7;font-size:11px;font-weight:400}
     button{border:0;border-radius:10px;padding:10px 14px;background:#1f4bb8;color:#fff;font-weight:700;cursor:pointer}
     button.ghost{background:#eef3ff;color:#23438a}
     .muted{color:#5c6d87;font-size:13px}
@@ -26,8 +27,8 @@
     .ip-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;background:#f3f6ff;color:#27406f;font-size:12px;font-weight:600}
     .ip-item button{padding:4px 8px;border-radius:999px;background:#dfe7ff;color:#23438a;font-size:11px}
     .empty{padding:18px;color:#66758f;font-size:13px;text-align:center}
-    .count-sort{display:inline-flex;gap:4px;vertical-align:middle;margin-left:6px}
-    .count-sort button{padding:4px 7px;border-radius:8px;background:#dfe7ff;color:#23438a;font-size:11px}
+    .sort-toggle{display:inline-block;margin-left:6px;padding:0;border:0;background:transparent;color:#6f80a0;font-size:13px;font-weight:800;cursor:pointer;width:auto}
+    .sort-toggle:hover{filter:none;color:#23438a}
   </style>
 </head>
 <body>
@@ -76,7 +77,8 @@
           <thead>
             <tr>
               <th>이메일</th>
-              <th>사용 횟수 <span class="count-sort"><button id="countAscBtn" type="button">▲</button><button id="countDescBtn" type="button">▼</button></span></th>
+              <th>요금제</th>
+              <th>사용 횟수 <button id="countSortToggle" type="button" class="sort-toggle" aria-label="사용 횟수 정렬">▼</button></th>
               <th>최근 사용 시각</th>
             </tr>
           </thead>
@@ -123,6 +125,7 @@
       ipList: document.getElementById("ipList"),
       summarySearch: document.getElementById("summarySearch"),
       summaryTbody: document.getElementById("summaryTbody"),
+      countSortToggle: document.getElementById("countSortToggle"),
       logSearch: document.getElementById("logSearch"),
       logSortField: document.getElementById("logSortField"),
       logSortDir: document.getElementById("logSortDir"),
@@ -159,14 +162,19 @@
       const query = (els.summarySearch.value || "").trim().toLowerCase();
       let rows = [...state.data.summaryRows];
       if (query) {
-        rows = rows.filter((row) => String(row.email || "").toLowerCase().includes(query) || String(row.count || "").includes(query));
+        rows = rows.filter((row) =>
+          String(row.email || "").toLowerCase().includes(query) ||
+          String(row.planName || "").toLowerCase().includes(query) ||
+          String(row.count || "").includes(query)
+        );
       }
       rows.sort((a, b) => state.summarySort === "asc"
         ? Number(a.count || 0) - Number(b.count || 0) || String(a.email || "").localeCompare(String(b.email || ""))
         : Number(b.count || 0) - Number(a.count || 0) || String(a.email || "").localeCompare(String(b.email || "")));
+      els.countSortToggle.textContent = state.summarySort === "asc" ? "▲" : "▼";
       els.summaryTbody.innerHTML = rows.length
-        ? rows.map((row) => `<tr><td>${escapeHtml(row.email)}</td><td>${row.count}</td><td>${escapeHtml(row.lastUsedAt)}</td></tr>`).join("")
-        : '<tr><td colspan="3" class="empty">조건에 맞는 사용 기록이 없습니다.</td></tr>';
+        ? rows.map((row) => `<tr><td>${escapeHtml(row.email)}</td><td>${escapeHtml(row.planName)}</td><td>${row.count}</td><td>${escapeHtml(row.lastUsedAt)}</td></tr>`).join("")
+        : '<tr><td colspan="4" class="empty">조건에 맞는 사용 기록이 없습니다.</td></tr>';
     }
 
     function renderLogs() {
@@ -253,8 +261,7 @@
     });
     document.getElementById('addIpBtn').addEventListener('click', () => { addIp(els.ipInput.value).catch((err) => { els.ipNotice.textContent = String(err.message || err); }); });
     document.getElementById('addCurrentIpBtn').addEventListener('click', () => { addIp(state.data.currentIp).catch((err) => { els.ipNotice.textContent = String(err.message || err); }); });
-    document.getElementById('countAscBtn').addEventListener('click', () => { state.summarySort = 'asc'; renderSummary(); });
-    document.getElementById('countDescBtn').addEventListener('click', () => { state.summarySort = 'desc'; renderSummary(); });
+    els.countSortToggle.addEventListener('click', () => { state.summarySort = state.summarySort === 'asc' ? 'desc' : 'asc'; renderSummary(); });
     els.summarySearch.addEventListener('input', renderSummary);
     els.logSearch.addEventListener('input', renderLogs);
     els.logSortField.addEventListener('change', renderLogs);

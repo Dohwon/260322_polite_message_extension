@@ -70,3 +70,5 @@
 [2026-04-05] free-10/admin-dashboard/gmail-support/coming-soon-ui aligned cards and buttons
 
 [2026-04-05] landing overlay/admin ip dashboard/popup preview overlay/admin usage split/status text updated
+
+[2026-04-05] admin feedback reply mail/db history + summary plan column + single triangle sort + bonus independent usage

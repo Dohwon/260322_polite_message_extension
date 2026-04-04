@@ -69,6 +69,16 @@ CREATE TABLE IF NOT EXISTS feedback_posts (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS feedback_replies (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  feedback_id INTEGER NOT NULL,
+  recipient_email TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  message TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(feedback_id) REFERENCES feedback_posts(id)
+);
+
 CREATE TABLE IF NOT EXISTS rewrite_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
@@ -258,6 +268,15 @@ const listFeedbackStmt = db.prepare(`
   FROM feedback_posts
   ORDER BY id DESC
   LIMIT ?
+`);
+const insertFeedbackReplyStmt = db.prepare(`
+  INSERT INTO feedback_replies (feedback_id, recipient_email, subject, message)
+  VALUES (?, ?, ?, ?)
+`);
+const listFeedbackRepliesStmt = db.prepare(`
+  SELECT id, feedback_id, recipient_email, subject, message, created_at
+  FROM feedback_replies
+  ORDER BY id DESC
 `);
 const insertRewriteLogStmt = db.prepare(`
   INSERT INTO rewrite_logs (
@@ -611,6 +630,19 @@ export function createFeedback({ email, topic, message }) {
 
 export function listFeedback(limit = 200) {
   return listFeedbackStmt.all(Number(limit) || 200);
+}
+
+export function createFeedbackReply({ feedbackId, recipientEmail, subject, message }) {
+  insertFeedbackReplyStmt.run(
+    Number(feedbackId),
+    String(recipientEmail || "").trim().toLowerCase(),
+    String(subject || "").trim(),
+    String(message || "").trim()
+  );
+}
+
+export function listFeedbackReplies() {
+  return listFeedbackRepliesStmt.all();
 }
 
 export function createRewriteLog({ userId, userEmail, originalText, rewrittenText, tone, recipient, senderRole, backgroundNote, harshFilterEnabled }) {
