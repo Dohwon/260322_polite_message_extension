@@ -1,5 +1,7 @@
 const LIVE_API_BASE_URL = "https://polite-message-rewriter-production.up.railway.app";
 const DEFAULT_API_BASE_URL = LIVE_API_BASE_URL;
+const GOOGLE_LOGIN_POLL_INTERVAL_MS = 800;
+const GOOGLE_LOGIN_MAX_ATTEMPTS = 150;
 
 const STORAGE_KEYS = {
   sessionToken: "sessionToken",
@@ -353,8 +355,10 @@ async function pollGoogleLogin(deviceId, { silent = false } = {}) {
   }
 
   try {
-    for (let attempt = 0; attempt < 90; attempt += 1) {
-      await delay(2000);
+    for (let attempt = 0; attempt < GOOGLE_LOGIN_MAX_ATTEMPTS; attempt += 1) {
+      if (attempt > 0) {
+        await delay(GOOGLE_LOGIN_POLL_INTERVAL_MS);
+      }
 
       const res = await fetch(
         `${state.apiBaseUrl}/api/auth/google/poll?deviceId=${encodeURIComponent(deviceId)}`

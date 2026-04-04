@@ -213,57 +213,20 @@ async function notifyFeedbackByEmail({ email, topic, message }) {
     message
   ].join("\n");
 
-  if (env.smtpHost && env.smtpUser && env.smtpPass && env.feedbackNotifyEmail) {
-    await getSmtpTransport().sendMail({
-      from: env.smtpUser,
-      to: env.feedbackNotifyEmail,
-      replyTo: email,
-      subject,
-      text
-    });
-    return { delivered: true, provider: "smtp" };
-  }
-
-  if (!env.resendApiKey || !env.feedbackNotifyEmail) {
-    return { delivered: false, reason: "email_not_configured" };
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.resendApiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      from: env.resendFromEmail,
-      to: [env.feedbackNotifyEmail],
-      reply_to: email,
-      subject,
-      text
-    })
+  return sendTransactionalEmail({
+    to: env.feedbackNotifyEmail,
+    subject,
+    text,
+    replyTo: email
   });
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw new Error(`feedback email delivery failed: ${res.status} ${errBody}`);
-  }
-
-  return { delivered: true, provider: "resend" };
 }
 
 async function sendFeedbackReplyEmail({ to, subject, message }) {
-  if (!env.smtpHost || !env.smtpUser || !env.smtpPass) {
-    return { delivered: false, reason: "email_not_configured" };
-  }
-
-  await getSmtpTransport().sendMail({
-    from: env.smtpUser,
+  return sendTransactionalEmail({
     to,
     subject,
     text: message
   });
-
-  return { delivered: true, provider: "smtp" };
 }
 
 function getSmtpTransport() {
@@ -282,6 +245,133 @@ function getSmtpTransport() {
     });
   }
   return smtpTransport;
+}
+
+function resolveMailProvider() {
+  const preferred = String(env.mailProvider || "").trim().toLowerCase();
+  if (preferred === "brevo") return "brevo";
+  if (preferred === "resend") return "resend";
+  if (preferred === "smtp") return "smtp";
+  if (env.brevoApiKey && env.brevoSenderEmail) return "brevo";
+  if (env.resendApiKey && env.resendFromEmail) return "resend";
+  if (env.smtpHost && env.smtpUser && env.smtpPass) return "smtp";
+  return "none";
+}
+
+async function sendTransactionalEmail({ to, subject, text, replyTo = "" }) {
+  const provider = resolveMailProvider();
+
+  if (!to || !subject || !text) {
+    return { delivered: false, reason: "invalid_email_payload", message: "메일 전송 정보가 올바르지 않습니다." };
+  }
+
+  if (provider === "brevo") {
+    if (!env.brevoApiKey || !env.brevoSenderEmail) {
+      return { delivered: false, reason: "email_not_configured", message: "Brevo 설정이 필요합니다." };
+    }
+    try {
+      const payload = {
+        sender: {
+          email: env.brevoSenderEmail,
+          name: env.brevoSenderName || "Polite Message"
+        },
+        to: [{ email: to }],
+        subject,
+        textContent: text
+      };
+      if (replyTo) {
+        payload.replyTo = { email: replyTo };
+      }
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": env.brevoApiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        return {
+          delivered: false,
+          reason: `brevo_${res.status}`,
+          message: `Brevo 전송 실패: ${res.status} ${errBody}`
+        };
+      }
+      return { delivered: true, provider: "brevo" };
+    } catch (err) {
+      console.error("brevo send failed", err?.message || err);
+      return {
+        delivered: false,
+        reason: err?.code || "brevo_send_failed",
+        message: err?.message || "Brevo 전송 실패"
+      };
+    }
+  }
+
+  if (provider === "resend") {
+    if (!env.resendApiKey || !env.resendFromEmail) {
+      return { delivered: false, reason: "email_not_configured", message: "Resend 설정이 필요합니다." };
+    }
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.resendApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          from: env.resendFromEmail,
+          to: [to],
+          reply_to: replyTo || undefined,
+          subject,
+          text
+        })
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        return {
+          delivered: false,
+          reason: `resend_${res.status}`,
+          message: `Resend 전송 실패: ${res.status} ${errBody}`
+        };
+      }
+      return { delivered: true, provider: "resend" };
+    } catch (err) {
+      console.error("resend send failed", err?.message || err);
+      return {
+        delivered: false,
+        reason: err?.code || "resend_send_failed",
+        message: err?.message || "Resend 전송 실패"
+      };
+    }
+  }
+
+  if (provider === "smtp") {
+    if (!env.smtpHost || !env.smtpUser || !env.smtpPass) {
+      return { delivered: false, reason: "email_not_configured", message: "SMTP 설정이 필요합니다." };
+    }
+    try {
+      await getSmtpTransport().sendMail({
+        from: env.smtpUser,
+        to,
+        replyTo: replyTo || undefined,
+        subject,
+        text
+      });
+      return { delivered: true, provider: "smtp" };
+    } catch (err) {
+      console.error("smtp send failed", err?.message || err);
+      return {
+        delivered: false,
+        reason: err?.code || "smtp_send_failed",
+        message: err?.message || "SMTP 전송 실패"
+      };
+    }
+  }
+
+  return { delivered: false, reason: "email_not_configured", message: "메일 발송 설정이 아직 없습니다." };
 }
 
 function sendFeedbackNotifyInBackground(payload) {
@@ -840,7 +930,15 @@ app.post("/admin/feedback/reply", requireAdminDashboard, async (req, res) => {
 
   const mail = await sendFeedbackReplyEmail({ to, subject, message });
   if (!mail.delivered) {
-    return res.status(503).json({ error: "SMTP 메일 설정이 아직 완료되지 않았습니다. Gmail 앱 비밀번호(SMTP_PASS)를 먼저 넣어 주세요." });
+    const failureReason = String(mail.message || mail.reason || "");
+    if (failureReason.toLowerCase().includes("timeout")) {
+      return res.status(503).json({
+        error: "현재 메일 발송 연결이 타임아웃되고 있습니다. 메일 발송 서비스 설정을 다시 확인해 주세요."
+      });
+    }
+    return res.status(503).json({
+      error: `답장 메일 전송에 실패했습니다. ${failureReason || "SMTP 설정을 확인해 주세요."}`
+    });
   }
 
   createFeedbackReply({ feedbackId, recipientEmail: to, subject, message });
