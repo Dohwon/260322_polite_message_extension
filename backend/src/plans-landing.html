@@ -578,10 +578,28 @@
 
     async function sendFeedbackNoticeEmail(payload) {
       if (!emailConfig?.enabled || !window.emailjs?.send) return { ok: false, skipped: true };
+      const fullMessage = [
+        "새 고객 문의가 접수되었습니다.",
+        "",
+        `회신 이메일: ${payload.email}`,
+        `문의 주제: ${payload.topic}`,
+        "",
+        "문의 내용:",
+        payload.message
+      ].join("\n");
       await window.emailjs.send(emailConfig.serviceId, emailConfig.feedbackTemplateId, {
         topic: payload.topic,
+        feedback_topic: payload.topic,
+        inquiry_topic: payload.topic,
+        subject: `[Polite 문의] ${payload.topic}`,
         reply_to: payload.email,
-        message: payload.message
+        reply_email: payload.email,
+        from_email: payload.email,
+        email: payload.email,
+        user_email: payload.email,
+        message: payload.message,
+        feedback_message: payload.message,
+        full_message: fullMessage
       });
       return { ok: true };
     }

@@ -6,7 +6,7 @@
   <title>Feedback Admin</title>
   <style>
     body{font-family:Pretendard,'Noto Sans KR',sans-serif;margin:0;background:#f6f8fc;color:#1b2230}
-    .wrap{max-width:1240px;margin:0 auto;padding:24px 18px 48px}
+    .wrap{max-width:1420px;margin:0 auto;padding:20px 10px 44px}
     .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
     .top button,.action-btn{border:0;border-radius:10px;padding:10px 14px;background:#eef3ff;color:#23438a;font-weight:700;cursor:pointer}
     h1,h2,h3{margin:0}
@@ -21,17 +21,20 @@
     select,input,textarea,button{font:inherit}
     .filters select,.filters input,textarea,input[type="text"]{border:1px solid #cfd8ec;border-radius:10px;padding:10px 12px;background:#fff}
     .filters input::placeholder, textarea::placeholder{color:#a7b3c7;font-size:11px;font-weight:400}
-    .layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:16px}
+    .layout{display:grid;grid-template-columns:minmax(0,1.28fr) minmax(0,.72fr);gap:14px}
     .card{background:#fff;border:1px solid #d9deea;border-radius:16px;padding:18px;box-shadow:0 20px 40px -30px rgba(16,32,67,.35);min-width:0}
     table{width:100%;border-collapse:collapse;table-layout:fixed}
-    th,td{border:1px solid #e3e7f1;padding:10px 8px;vertical-align:top;text-align:left;font-size:12px;line-height:1.5;word-break:break-word}
+    th,td{border:1px solid #e3e7f1;padding:9px 7px;vertical-align:top;text-align:left;font-size:12px;line-height:1.45}
     th{background:#eef3ff}
-    .list-table col.topic{width:18%}
-    .list-table col.email{width:24%}
-    .list-table col.status{width:12%}
-    .list-table col.time{width:18%}
-    .list-table col.preview{width:20%}
+    .list-table col.topic{width:14%}
+    .list-table col.email{width:30%}
+    .list-table col.status{width:11%}
+    .list-table col.time{width:19%}
+    .list-table col.preview{width:18%}
     .list-table col.action{width:8%}
+    .cell-nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .cell-preview{white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+    .cell-action,.cell-action .action-btn{white-space:nowrap}
     .status-chip{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800}
     .status-chip.done{background:#e8f8ee;color:#21572f}
     .status-chip.todo{background:#fff1f2;color:#a11b2b}
@@ -40,6 +43,7 @@
     .reply-history{display:flex;flex-direction:column;gap:10px;margin-top:12px}
     .reply-form{display:flex;flex-direction:column;gap:10px;margin-top:14px}
     .reply-form textarea{min-height:168px;resize:vertical}
+    .reply-banner{margin-top:12px;padding:10px 12px;border-radius:12px;background:#eef5ff;color:#2a467d;font-size:12px;font-weight:600}
     .reply-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .reply-submit{border:0;border-radius:10px;padding:10px 14px;background:#1f4bb8;color:#fff;font-weight:700;cursor:pointer}
     .reply-status{font-size:12px;color:#5c6d87;min-height:16px}
@@ -151,8 +155,13 @@
       }
       await window.emailjs.send(emailConfig.serviceId, emailConfig.replyTemplateId, {
         to_email: item.email,
+        email: item.email,
+        user_email: item.email,
+        recipient_email: item.email,
         subject,
-        message
+        title: subject,
+        message,
+        reply_message: message
       });
     }
 
@@ -226,12 +235,12 @@
       els.nextPageBtn.disabled = state.currentPage >= totalPages;
       els.listBody.innerHTML = visibleRows.length ? visibleRows.map((item) => `
         <tr>
-          <td>${escapeHtml(item.topic)}</td>
-          <td>${escapeHtml(item.email)}</td>
-          <td><span class="status-chip ${item.replied ? 'done' : 'todo'}">${item.replied ? '답장 완료' : '미답장'}</span></td>
-          <td>${escapeHtml(item.created_at)}</td>
-          <td>${escapeHtml(String(item.message || '').slice(0, 60))}</td>
-          <td><button type="button" class="action-btn" data-open-id="${item.id}">열기</button></td>
+          <td class="cell-nowrap" title="${escapeHtml(item.topic)}">${escapeHtml(item.topic)}</td>
+          <td class="cell-nowrap" title="${escapeHtml(item.email)}">${escapeHtml(item.email)}</td>
+          <td class="cell-nowrap"><span class="status-chip ${item.replied ? 'done' : 'todo'}">${item.replied ? '답장 완료' : '미답장'}</span></td>
+          <td class="cell-nowrap" title="${escapeHtml(item.created_at)}">${escapeHtml(item.created_at)}</td>
+          <td class="cell-preview">${escapeHtml(String(item.message || '').slice(0, 60))}</td>
+          <td class="cell-action"><button type="button" class="action-btn" data-open-id="${item.id}">열기</button></td>
         </tr>
       `).join('') : '<tr><td colspan="6" class="empty">조건에 맞는 문의가 없습니다.</td></tr>';
       els.listBody.querySelectorAll('[data-open-id]').forEach((button) => {
@@ -250,20 +259,24 @@
         return;
       }
       const replies = Array.isArray(item.replies) ? item.replies : [];
+      const replyBanner = replies.length
+        ? `<div class="reply-banner">이 문의에는 이미 ${replies.length}건의 답장을 보냈습니다. 아래에서 기존 답장을 확인하거나 추가 답장을 보낼 수 있습니다.</div>`
+        : '';
       els.detailRoot.className = '';
       els.detailRoot.innerHTML = `
         <div class="meta">${escapeHtml(item.created_at)} · ${escapeHtml(item.email)} · ${escapeHtml(item.topic)}</div>
         <div class="message-box" style="margin-top:12px">${escapeHtml(item.message)}</div>
+        ${replyBanner}
         <form id="replyForm" class="reply-form">
           <input id="replySubject" type="text" value="${escapeHtml(`[Polite 답변] ${item.topic}`)}" />
           <textarea id="replyMessage" placeholder="고객에게 보낼 답장을 입력해 주세요"></textarea>
           <div class="reply-actions">
-            <button id="replySubmitBtn" type="submit" class="reply-submit">메일 답장 보내기</button>
+            <button id="replySubmitBtn" type="submit" class="reply-submit">${replies.length ? '추가 답장 보내기' : '메일 답장 보내기'}</button>
             <span id="replyStatus" class="reply-status"></span>
           </div>
         </form>
         <div style="margin-top:18px">
-          <h3>보낸 답장</h3>
+          <h3>보낸 답장 ${replies.length ? `(${replies.length})` : ''}</h3>
           <div class="reply-history">${replies.length ? replies.map((reply) => `
             <div class="reply-item"><div class="meta" style="margin-bottom:6px">${escapeHtml(reply.created_at)} · ${escapeHtml(reply.subject)}</div>${escapeHtml(reply.message)}</div>
           `).join('') : '<div class="detail-empty">아직 보낸 답장이 없습니다.</div>'}</div>
