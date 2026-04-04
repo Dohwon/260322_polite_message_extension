@@ -21,17 +21,17 @@
     select,input,textarea,button{font:inherit}
     .filters select,.filters input,textarea,input[type="text"]{border:1px solid #cfd8ec;border-radius:10px;padding:10px 12px;background:#fff}
     .filters input::placeholder, textarea::placeholder{color:#a7b3c7;font-size:11px;font-weight:400}
-    .layout{display:grid;grid-template-columns:minmax(0,1.28fr) minmax(0,.72fr);gap:14px}
+    .layout{display:grid;grid-template-columns:minmax(0,1.34fr) minmax(0,.66fr);gap:14px}
     .card{background:#fff;border:1px solid #d9deea;border-radius:16px;padding:18px;box-shadow:0 20px 40px -30px rgba(16,32,67,.35);min-width:0}
     table{width:100%;border-collapse:collapse;table-layout:fixed}
     th,td{border:1px solid #e3e7f1;padding:9px 7px;vertical-align:top;text-align:left;font-size:12px;line-height:1.45}
     th{background:#eef3ff}
-    .list-table col.topic{width:14%}
-    .list-table col.email{width:30%}
-    .list-table col.status{width:11%}
-    .list-table col.time{width:19%}
-    .list-table col.preview{width:18%}
-    .list-table col.action{width:8%}
+    .list-table col.topic{width:11%}
+    .list-table col.email{width:25%}
+    .list-table col.status{width:10%}
+    .list-table col.time{width:16%}
+    .list-table col.preview{width:32%}
+    .list-table col.action{width:6%}
     .cell-nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .cell-preview{white-space:normal;overflow-wrap:anywhere;word-break:break-word}
     .cell-action,.cell-action .action-btn{white-space:nowrap}
@@ -239,7 +239,7 @@
           <td class="cell-nowrap" title="${escapeHtml(item.email)}">${escapeHtml(item.email)}</td>
           <td class="cell-nowrap"><span class="status-chip ${item.replied ? 'done' : 'todo'}">${item.replied ? '답장 완료' : '미답장'}</span></td>
           <td class="cell-nowrap" title="${escapeHtml(item.created_at)}">${escapeHtml(item.created_at)}</td>
-          <td class="cell-preview">${escapeHtml(String(item.message || '').slice(0, 60))}</td>
+          <td class="cell-preview">${escapeHtml(String(item.message || '').slice(0, 120))}</td>
           <td class="cell-action"><button type="button" class="action-btn" data-open-id="${item.id}">열기</button></td>
         </tr>
       `).join('') : '<tr><td colspan="6" class="empty">조건에 맞는 문의가 없습니다.</td></tr>';
