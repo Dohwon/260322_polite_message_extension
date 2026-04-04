@@ -276,6 +276,14 @@ const insertFeedbackReplyStmt = db.prepare(`
   INSERT INTO feedback_replies (feedback_id, recipient_email, subject, message)
   VALUES (?, ?, ?, ?)
 `);
+const deleteFeedbackRepliesByFeedbackIdStmt = db.prepare(`
+  DELETE FROM feedback_replies
+  WHERE feedback_id = ?
+`);
+const deleteFeedbackPostStmt = db.prepare(`
+  DELETE FROM feedback_posts
+  WHERE id = ?
+`);
 const listFeedbackRepliesStmt = db.prepare(`
   SELECT id, feedback_id, recipient_email, subject, message, created_at
   FROM feedback_replies
@@ -646,6 +654,23 @@ export function createFeedbackReply({ feedbackId, recipientEmail, subject, messa
 
 export function listFeedbackReplies() {
   return listFeedbackRepliesStmt.all();
+}
+
+const deleteFeedbackByIdsTxn = db.transaction((ids) => {
+  let deletedCount = 0;
+  for (const rawId of ids) {
+    const id = Number(rawId);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    deleteFeedbackRepliesByFeedbackIdStmt.run(id);
+    const info = deleteFeedbackPostStmt.run(id);
+    deletedCount += Number(info?.changes || 0);
+  }
+  return deletedCount;
+});
+
+export function deleteFeedbackByIds(ids = []) {
+  if (!Array.isArray(ids) || ids.length === 0) return 0;
+  return deleteFeedbackByIdsTxn(ids);
 }
 
 export function createRewriteLog({ userId, userEmail, originalText, rewrittenText, tone, recipient, senderRole, backgroundNote, harshFilterEnabled }) {

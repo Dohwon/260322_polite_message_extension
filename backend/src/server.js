@@ -31,6 +31,7 @@ import {
   getUserByGoogleSub,
   getUserBySessionToken,
   linkGoogleAccount,
+  deleteFeedbackByIds,
   listFeedback,
   listFeedbackReplies,
   listRewriteLogs,
@@ -972,6 +973,24 @@ app.post("/admin/feedback/reply", requireAdminDashboard, async (req, res) => {
 
   createFeedbackReply({ feedbackId, recipientEmail: to, subject, message });
   return res.json({ ok: true, message: "답장을 보냈습니다." });
+});
+
+app.post("/admin/feedback/delete", requireAdminDashboard, (req, res) => {
+  const ids = Array.isArray(req.body?.feedbackIds) ? req.body.feedbackIds : [];
+  const normalizedIds = ids
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+
+  if (normalizedIds.length === 0) {
+    return res.status(400).json({ error: "삭제할 문의를 1개 이상 선택해 주세요." });
+  }
+
+  const deletedCount = deleteFeedbackByIds(normalizedIds);
+  return res.json({
+    ok: true,
+    deletedCount,
+    message: `${deletedCount}건의 문의를 삭제했습니다.`
+  });
 });
 
 app.post("/admin/credits/grant", requireAdminDashboard, (req, res) => {

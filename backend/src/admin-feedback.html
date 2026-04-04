@@ -6,14 +6,17 @@
   <title>Feedback Admin</title>
   <style>
     body{font-family:Pretendard,'Noto Sans KR',sans-serif;margin:0;background:#f6f8fc;color:#1b2230}
-    .wrap{max-width:1420px;margin:0 auto;padding:20px 10px 44px}
+    .wrap{max-width:1480px;margin:0 auto;padding:18px 6px 42px}
     .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
     .top button,.action-btn{border:0;border-radius:10px;padding:10px 14px;background:#eef3ff;color:#23438a;font-weight:700;cursor:pointer}
     h1,h2,h3{margin:0}
     h1{font-size:28px}
     h2{font-size:20px;margin-bottom:10px}
     .meta{color:#5c6d87;font-size:12px}
-    .toolbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+    .toolbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+    .bulkbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+    .bulk-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .bulk-note{font-size:12px;color:#5c6d87}
     .tabs{display:flex;gap:8px;flex-wrap:wrap}
     .tab{border:1px solid #d7e0f3;border-radius:999px;padding:8px 12px;background:#fff;color:#405475;font-size:12px;font-weight:700;cursor:pointer}
     .tab.active{background:#1f4bb8;color:#fff;border-color:#1f4bb8}
@@ -21,15 +24,16 @@
     select,input,textarea,button{font:inherit}
     .filters select,.filters input,textarea,input[type="text"]{border:1px solid #cfd8ec;border-radius:10px;padding:10px 12px;background:#fff}
     .filters input::placeholder, textarea::placeholder{color:#a7b3c7;font-size:11px;font-weight:400}
-    .layout{display:grid;grid-template-columns:minmax(0,1.34fr) minmax(0,.66fr);gap:14px}
+    .layout{display:grid;grid-template-columns:minmax(0,1.36fr) minmax(0,.64fr);gap:12px}
     .card{background:#fff;border:1px solid #d9deea;border-radius:16px;padding:18px;box-shadow:0 20px 40px -30px rgba(16,32,67,.35);min-width:0}
     table{width:100%;border-collapse:collapse;table-layout:fixed}
     th,td{border:1px solid #e3e7f1;padding:9px 7px;vertical-align:top;text-align:left;font-size:12px;line-height:1.45}
     th{background:#eef3ff}
-    .list-table col.topic{width:11%}
-    .list-table col.email{width:25%}
+    .list-table col.check{width:4%}
+    .list-table col.topic{width:10%}
+    .list-table col.email{width:23%}
     .list-table col.status{width:10%}
-    .list-table col.time{width:16%}
+    .list-table col.time{width:15%}
     .list-table col.preview{width:30%}
     .list-table col.action{width:8%}
     .cell-nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -37,6 +41,10 @@
     .cell-action{text-align:center}
     .cell-action,.cell-action .action-btn{white-space:nowrap}
     .action-btn{padding:8px 10px;font-size:11px}
+    .check-cell{text-align:center;vertical-align:middle}
+    .check-cell input{width:15px;height:15px;cursor:pointer}
+    .danger-btn{border:0;border-radius:10px;padding:9px 12px;background:#fff1f2;color:#a11b2b;font-weight:800;cursor:pointer}
+    .danger-btn:disabled{opacity:.45;cursor:not-allowed}
     .status-chip{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800}
     .status-chip.done{background:#e8f8ee;color:#21572f}
     .status-chip.todo{background:#fff1f2;color:#a11b2b}
@@ -83,8 +91,16 @@
     <div class="layout">
       <section class="card">
         <h2>문의 리스트</h2>
+        <div class="bulkbar">
+          <div class="bulk-actions">
+            <label class="bulk-note"><input id="selectAllOnPage" type="checkbox" /> 현재 페이지 전체 선택</label>
+            <button id="deleteSelectedBtn" type="button" class="danger-btn" disabled>선택 삭제</button>
+          </div>
+          <div id="bulkMeta" class="bulk-note">삭제할 문의를 선택해 주세요.</div>
+        </div>
         <table class="list-table">
           <colgroup>
+            <col class="check" />
             <col class="topic" />
             <col class="email" />
             <col class="status" />
@@ -94,6 +110,7 @@
           </colgroup>
           <thead>
             <tr>
+              <th class="check-cell">선택</th>
               <th>유형</th>
               <th>이메일</th>
               <th>답장 여부</th>
@@ -123,7 +140,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script>
     const PAGE_SIZE = 20;
-    const state = { topics: [], items: [], activeTopic: 'all', filter: 'all', selectedId: null, currentPage: 1 };
+    const state = { topics: [], items: [], activeTopic: 'all', filter: 'all', selectedId: null, currentPage: 1, selectedIds: new Set() };
     let emailConfig = null;
     const els = {
       summaryMeta: document.getElementById('summaryMeta'),
@@ -132,6 +149,9 @@
       searchInput: document.getElementById('searchInput'),
       listBody: document.getElementById('listBody'),
       detailRoot: document.getElementById('detailRoot'),
+      bulkMeta: document.getElementById('bulkMeta'),
+      selectAllOnPage: document.getElementById('selectAllOnPage'),
+      deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
       pagerMeta: document.getElementById('pagerMeta'),
       prevPageBtn: document.getElementById('prevPageBtn'),
       nextPageBtn: document.getElementById('nextPageBtn')
@@ -232,6 +252,27 @@
       };
     }
 
+    function currentPageRows() {
+      return pagedItems(filteredItems()).rows;
+    }
+
+    function syncBulkUi() {
+      const pageRows = currentPageRows();
+      const selectedVisibleCount = pageRows.filter((row) => state.selectedIds.has(Number(row.id))).length;
+      if (els.bulkMeta) {
+        els.bulkMeta.textContent = state.selectedIds.size
+          ? `${state.selectedIds.size}건 선택됨`
+          : '삭제할 문의를 선택해 주세요.';
+      }
+      if (els.selectAllOnPage) {
+        els.selectAllOnPage.checked = pageRows.length > 0 && selectedVisibleCount === pageRows.length;
+        els.selectAllOnPage.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < pageRows.length;
+      }
+      if (els.deleteSelectedBtn) {
+        els.deleteSelectedBtn.disabled = state.selectedIds.size === 0;
+      }
+    }
+
     function renderList() {
       const rows = filteredItems();
       const { rows: visibleRows, start, totalPages } = pagedItems(rows);
@@ -243,6 +284,7 @@
       els.nextPageBtn.disabled = state.currentPage >= totalPages;
       els.listBody.innerHTML = visibleRows.length ? visibleRows.map((item) => `
         <tr>
+          <td class="check-cell"><input type="checkbox" data-check-id="${item.id}" ${state.selectedIds.has(Number(item.id)) ? 'checked' : ''} /></td>
           <td class="cell-nowrap" title="${escapeHtml(item.topic)}">${escapeHtml(item.topic)}</td>
           <td class="cell-nowrap" title="${escapeHtml(item.email)}">${escapeHtml(item.email)}</td>
           <td class="cell-nowrap"><span class="status-chip ${item.replied ? 'done' : 'todo'}">${item.replied ? '답장 완료' : '미답장'}</span></td>
@@ -250,13 +292,23 @@
           <td class="cell-preview">${escapeHtml(String(item.message || '').slice(0, 120))}</td>
           <td class="cell-action"><button type="button" class="action-btn" data-open-id="${item.id}">열기</button></td>
         </tr>
-      `).join('') : '<tr><td colspan="6" class="empty">조건에 맞는 문의가 없습니다.</td></tr>';
+      `).join('') : '<tr><td colspan="7" class="empty">조건에 맞는 문의가 없습니다.</td></tr>';
+      els.listBody.querySelectorAll('[data-check-id]').forEach((checkbox) => {
+        checkbox.addEventListener('change', () => {
+          const id = Number(checkbox.getAttribute('data-check-id') || 0);
+          if (!Number.isFinite(id) || id <= 0) return;
+          if (checkbox.checked) state.selectedIds.add(id);
+          else state.selectedIds.delete(id);
+          syncBulkUi();
+        });
+      });
       els.listBody.querySelectorAll('[data-open-id]').forEach((button) => {
         button.addEventListener('click', () => {
           state.selectedId = Number(button.getAttribute('data-open-id') || 0);
           renderDetail();
         });
       });
+      syncBulkUi();
     }
 
     function renderDetail() {
@@ -325,6 +377,7 @@
       if (!res.ok) throw new Error(json.error || '문의 데이터를 불러오지 못했습니다.');
       state.topics = json.topics || [];
       state.items = json.items || [];
+      state.selectedIds = new Set(Array.from(state.selectedIds).filter((id) => state.items.some((item) => Number(item.id) === id)));
       state.selectedId = preferredId || state.selectedId || (state.items[0]?.id ?? null);
       renderTabs();
       renderList();
@@ -356,6 +409,39 @@
       state.selectedId = null;
       renderList();
       renderDetail();
+    });
+    els.selectAllOnPage.addEventListener('change', () => {
+      const pageRows = currentPageRows();
+      if (els.selectAllOnPage.checked) {
+        pageRows.forEach((row) => state.selectedIds.add(Number(row.id)));
+      } else {
+        pageRows.forEach((row) => state.selectedIds.delete(Number(row.id)));
+      }
+      renderList();
+    });
+    els.deleteSelectedBtn.addEventListener('click', async () => {
+      const ids = Array.from(state.selectedIds);
+      if (!ids.length) return;
+      const ok = window.confirm(`선택한 ${ids.length}건의 문의를 정말 삭제하시겠습니까?`);
+      if (!ok) return;
+      els.deleteSelectedBtn.disabled = true;
+      try {
+        const res = await fetch('/admin/feedback/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feedbackIds: ids })
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || '문의 삭제 실패');
+        alert(json.message || '문의를 삭제했습니다.');
+        state.selectedIds.clear();
+        state.selectedId = null;
+        await loadData();
+      } catch (err) {
+        alert(humanizeError(err));
+      } finally {
+        syncBulkUi();
+      }
     });
 
     Promise.all([loadEmailConfig(), loadData()]).catch((err) => {
