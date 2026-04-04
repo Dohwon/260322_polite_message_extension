@@ -7,6 +7,7 @@ __pycache__/
 *.pyc
 .DS_Store
 *.zip
+.codex
 
 # >>> codex-auto-ignore >>>
 # secrets/env
@@ -50,6 +51,18 @@ Thumbs.db
 
 # windows metadata
 *:Zone.Identifier
+
+# local QA/CWS capture artifacts
+reports/capture_case*.html
+reports/capture_case*.png
+reports/cws_assets/*_actual*.png
+reports/cws_assets/*_from_*.png
+reports/cws_assets/store_*.png
+reports/cws_assets/popup_capture_source.html
+
+# discarded icon generation drafts
+extension/icons/*high_resolution*.png
+extension/icons/create_a_*.png
 
 # >>> codex-sensitive-ignore >>>
 # env/secrets

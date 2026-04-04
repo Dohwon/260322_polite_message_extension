@@ -4,35 +4,34 @@
 
 - [x] (2026-04-05) Polite Message Rewriter v1 완료
   - result: Google OAuth, 무료 사용량, 관리자 대시보드, 고객 문의 저장, 관리자 답장, Railway Volume 영구 저장, EmailJS 메일 연동까지 완료
-  - note: 결제와 CWS 정식 제출은 다음 단계 backlog로 유지
+  - note: 결제 자동화와 CWS 정식 제출은 v1 완료 조건이 아니라 향후 장기 backlog로 분리
+- [x] (2026-04-05) v1 최종 QA 실행 완료
+  - result: 무료 런치 범위 기준 핵심 플로우 점검 완료
+  - note: 결제 오버레이 유지 상태는 의도된 현재 정책이며 v1 종료 판정과 충돌하지 않음
 
 ## In Progress
 - 현재 진행중인 단기 작업 없음
 
 ## Pending
-
-- [ ] (2026-03-29) Toss Payments 환경변수 Railway 등록
-  - next-action: TOSS_CLIENT_KEY / TOSS_SECRET_KEY 등록 → Toss sandbox 결제 시뮬레이터로 Pro Monthly 결제 시나리오 테스트
-  - due: 2026-04-07
-  - depends: Google OAuth 테스트 통과 후
-
-- [ ] (2026-03-29) 무료→유료 플랜 전환 자동화 연결
-  - next-action: Toss 결제 성공 webhook → DB plan 업데이트 → 팝업 제한 해제 전 플로우 E2E 테스트
-  - due: 2026-04-10
-  - depends: Toss 환경변수 등록
-
-- [ ] (2026-03-29) CWS 제출 전 최종 QA 체크리스트 실행
-  - next-action: docs/cws-submission-checklist.md 30개 항목 순서대로 점검
-  - due: 2026-04-15
-  - depends: OAuth + 결제 E2E 완료
+- 현재 열린 단기 작업 없음
 
 ## Blocked
+- 현재 blocked 단기 작업 없음
 
-- [ ] Pro/Business/Top-up 버튼 활성화 (overlay 제거)
-  - blocked-by: Toss 결제 자동화 완성 전까지 "준비중" 유지
+## Future Backlog
+
+- [ ] 결제 수단 재선정 및 유료 전환 자동화
+  - note: Toss Payments는 현 단계에서 사용하지 않음
+  - trigger: 수익화 재개 시점에 결제 수단부터 다시 결정
+
+- [ ] CWS 정식 제출 패키지 재정비
+  - note: v1 free launch와 분리된 후속 확장 과제
+  - trigger: 결제/운영 정책 재확정 후 재개
 
 ## Done (Recent)
 
+- [x] (2026-04-05) v1 범위 종료 및 장기 backlog 분리
+- [x] (2026-04-05) 최종 QA 실행 완료
 - [x] (2026-04-05) EmailJS 기반 고객 문의 메일 알림 + 관리자 답장 메일 발송 연결
 - [x] (2026-04-05) 관리자 문의함 탭/필터/페이징/추가 답장 UX 정리
 - [x] (2026-04-05) Railway Volume 기반 DB 영구 저장 전환
