@@ -488,7 +488,7 @@
             ? "Pro 플랜 로그인 상태"
             : "Free 로그인 상태";
         sessionChip.textContent = label;
-        sessionCopy.textContent = ` 계정으로 로그인되어 있습니다. 현재는 이 계정 기준으로 무료 사용량이 적용되며, 유료 기능은 준비중입니다.`;
+        sessionCopy.textContent = `${json.email} 계정으로 로그인되어 있습니다. 현재는 이 계정 기준으로 무료 사용량이 적용되며, 유료 기능은 준비중입니다.`;
       } catch (_err) {
         // ignore
       }
