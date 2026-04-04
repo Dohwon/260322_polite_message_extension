@@ -63,6 +63,7 @@ const adminSessions = new Map();
 const TOPUP_10_PLAN_ID = "topup10";
 const TOPUP_10_REQUESTS = 10;
 const TOPUP_10_PRICE_KRW = 1000;
+let smtpTransport = null;
 
 function normalizeEmailForBypass(email) {
   const raw = String(email || "").trim().toLowerCase();
@@ -213,17 +214,7 @@ async function notifyFeedbackByEmail({ email, topic, message }) {
   ].join("\n");
 
   if (env.smtpHost && env.smtpUser && env.smtpPass && env.feedbackNotifyEmail) {
-    const transport = nodemailer.createTransport({
-      host: env.smtpHost,
-      port: env.smtpPort,
-      secure: env.smtpSecure,
-      auth: {
-        user: env.smtpUser,
-        pass: env.smtpPass
-      }
-    });
-
-    await transport.sendMail({
+    await getSmtpTransport().sendMail({
       from: env.smtpUser,
       to: env.feedbackNotifyEmail,
       replyTo: email,
@@ -265,17 +256,7 @@ async function sendFeedbackReplyEmail({ to, subject, message }) {
     return { delivered: false, reason: "email_not_configured" };
   }
 
-  const transport = nodemailer.createTransport({
-    host: env.smtpHost,
-    port: env.smtpPort,
-    secure: env.smtpSecure,
-    auth: {
-      user: env.smtpUser,
-      pass: env.smtpPass
-    }
-  });
-
-  await transport.sendMail({
+  await getSmtpTransport().sendMail({
     from: env.smtpUser,
     to,
     subject,
@@ -283,6 +264,34 @@ async function sendFeedbackReplyEmail({ to, subject, message }) {
   });
 
   return { delivered: true, provider: "smtp" };
+}
+
+function getSmtpTransport() {
+  if (!smtpTransport) {
+    smtpTransport = nodemailer.createTransport({
+      host: env.smtpHost,
+      port: env.smtpPort,
+      secure: env.smtpSecure,
+      auth: {
+        user: env.smtpUser,
+        pass: env.smtpPass
+      },
+      connectionTimeout: env.smtpTimeoutMs,
+      greetingTimeout: env.smtpTimeoutMs,
+      socketTimeout: env.smtpTimeoutMs
+    });
+  }
+  return smtpTransport;
+}
+
+function sendFeedbackNotifyInBackground(payload) {
+  setTimeout(async () => {
+    try {
+      await notifyFeedbackByEmail(payload);
+    } catch (err) {
+      console.error("feedback notify failed", err?.message || err);
+    }
+  }, 0);
 }
 
 const FEEDBACK_TOPICS = new Set([
@@ -695,23 +704,12 @@ app.post("/api/feedback", async (req, res) => {
   }
 
   createFeedback({ email, topic, message });
-
-  try {
-    const mail = await notifyFeedbackByEmail({ email, topic, message });
-    return res.json({
-      ok: true,
-      emailDelivered: Boolean(mail.delivered),
-      message: mail.delivered
-        ? "문의가 정상 접수되었습니다. 확인 후 답장을 보내드릴게요."
-        : "문의가 정상 접수되었습니다. 운영 메일 알림 설정은 아직 마무리 중이지만, 관리자 화면에는 바로 저장되었습니다."
-    });
-  } catch (_err) {
-    return res.json({
-      ok: true,
-      emailDelivered: false,
-      message: "문의가 정상 접수되었습니다. 확인 후 답장을 보내드릴게요."
-    });
-  }
+  sendFeedbackNotifyInBackground({ email, topic, message });
+  return res.json({
+    ok: true,
+    emailDelivered: null,
+    message: "문의가 정상 접수되었습니다. 확인 후 답장을 보내드릴게요."
+  });
 });
 
 app.post("/admin/login", (req, res) => {
