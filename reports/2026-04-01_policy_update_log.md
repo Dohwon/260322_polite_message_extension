@@ -66,3 +66,5 @@
 
 - `RESEND_API_KEY` and valid `RESEND_FROM_EMAIL` still need real production values
 - recurring billing / cancel-at-period-end semantics are policy-level only unless final PG strategy is chosen
+
+[2026-04-05] free-10/admin-dashboard/gmail-support/coming-soon-ui aligned cards and buttons

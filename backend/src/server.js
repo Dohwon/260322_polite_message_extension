@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import OpenAI from "openai";
+import nodemailer from "nodemailer";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,7 @@ import {
   consumeFreeDailyUsage,
   consumeBonusRequest,
   createFeedback,
+  createRewriteLog,
   createTossOrder,
   createOrGetUser,
   dbHealth,
@@ -26,6 +28,7 @@ import {
   getUserBySessionToken,
   linkGoogleAccount,
   listFeedback,
+  listRewriteLogs,
   markTossOrderPaid,
   setFreeCredits,
   setUserSession,
@@ -47,6 +50,7 @@ const __dirname = path.dirname(__filename);
 const plansLandingPath = path.join(__dirname, "plans-landing.html");
 const oauthPendingStates = new Map();
 const oauthDeviceResults = new Map();
+const adminSessions = new Map();
 const TOPUP_10_PLAN_ID = "topup10";
 const TOPUP_10_REQUESTS = 10;
 const TOPUP_10_PRICE_KRW = 1000;
@@ -188,10 +192,6 @@ function renderSimplePage(title, body) {
 }
 
 async function notifyFeedbackByEmail({ email, topic, message }) {
-  if (!env.resendApiKey || !env.feedbackNotifyEmail) {
-    return { delivered: false, reason: "email_not_configured" };
-  }
-
   const subject = `[Polite 문의] ${topic}`;
   const text = [
     "새 고객 문의가 접수되었습니다.",
@@ -202,6 +202,31 @@ async function notifyFeedbackByEmail({ email, topic, message }) {
     "문의 내용:",
     message
   ].join("\n");
+
+  if (env.smtpHost && env.smtpUser && env.smtpPass && env.feedbackNotifyEmail) {
+    const transport = nodemailer.createTransport({
+      host: env.smtpHost,
+      port: env.smtpPort,
+      secure: env.smtpSecure,
+      auth: {
+        user: env.smtpUser,
+        pass: env.smtpPass
+      }
+    });
+
+    await transport.sendMail({
+      from: env.smtpUser,
+      to: env.feedbackNotifyEmail,
+      replyTo: email,
+      subject,
+      text
+    });
+    return { delivered: true, provider: "smtp" };
+  }
+
+  if (!env.resendApiKey || !env.feedbackNotifyEmail) {
+    return { delivered: false, reason: "email_not_configured" };
+  }
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -223,7 +248,7 @@ async function notifyFeedbackByEmail({ email, topic, message }) {
     throw new Error(`feedback email delivery failed: ${res.status} ${errBody}`);
   }
 
-  return { delivered: true };
+  return { delivered: true, provider: "resend" };
 }
 
 const FEEDBACK_TOPICS = new Set([
@@ -295,6 +320,59 @@ function cleanupOauthCache() {
 function hasAdminAccess(req) {
   const key = String(req.header("x-admin-key") || req.query.key || "").trim();
   return Boolean(env.adminViewKey) && key === env.adminViewKey;
+}
+
+function parseCookies(req) {
+  const raw = String(req.header("cookie") || "");
+  const result = {};
+  for (const part of raw.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
+    if (!key) continue;
+    result[key] = decodeURIComponent(rest.join("="));
+  }
+  return result;
+}
+
+function getClientIp(req) {
+  return normalizeClientIp(req.ip || req.socket?.remoteAddress);
+}
+
+function isAllowedAdminIp(req) {
+  const allowed = String(env.adminAllowedIps || "").split(",").map((v) => v.trim()).filter(Boolean);
+  if (allowed.length === 0) return true;
+  const ip = getClientIp(req);
+  return Boolean(ip) && allowed.includes(ip);
+}
+
+function createAdminSession(req) {
+  const token = crypto.createHash("sha256").update(`${env.adminSessionSecret || env.ipQuotaSalt}:${Date.now()}:${Math.random()}`).digest("hex");
+  adminSessions.set(token, { ip: getClientIp(req), expiresAtMs: Date.now() + 12 * 60 * 60 * 1000 });
+  return token;
+}
+
+function cleanupAdminSessions() {
+  const now = Date.now();
+  for (const [token, session] of adminSessions.entries()) {
+    if (session.expiresAtMs < now) adminSessions.delete(token);
+  }
+}
+
+function requireAdminDashboard(req, res, next) {
+  cleanupAdminSessions();
+  if (!isAllowedAdminIp(req)) {
+    return res.status(403).send("관리자 허용 IP가 아닙니다.");
+  }
+  const cookies = parseCookies(req);
+  const token = String(cookies.pm_admin_session || "").trim();
+  const session = token ? adminSessions.get(token) : null;
+  if (!session) {
+    return res.status(401).send("관리자 로그인이 필요합니다.");
+  }
+  if (session.ip && session.ip !== getClientIp(req)) {
+    adminSessions.delete(token);
+    return res.status(401).send("관리자 세션이 만료되었습니다.");
+  }
+  return next();
 }
 
 const rewriteLimiter = rateLimit({
@@ -588,10 +666,89 @@ app.post("/api/feedback", async (req, res) => {
   }
 });
 
-app.get("/admin/feedback", (req, res) => {
-  if (!hasAdminAccess(req)) {
-    return res.status(401).send("Unauthorized");
+app.post("/admin/login", (req, res) => {
+  const password = String(req.body?.password || "").trim();
+  if (!isAllowedAdminIp(req)) {
+    return res.status(403).json({ error: "허용된 IP에서만 접근할 수 있습니다." });
   }
+  if (!env.adminDashboardPassword) {
+    return res.status(503).json({ error: "관리자 비밀번호가 아직 설정되지 않았습니다." });
+  }
+  if (password !== env.adminDashboardPassword) {
+    return res.status(401).json({ error: "비밀번호가 올바르지 않습니다." });
+  }
+  const token = createAdminSession(req);
+  const secureSuffix = requestBaseUrl(req).startsWith("https://") ? "; Secure" : "";
+  res.setHeader("Set-Cookie", "pm_admin_session=" + token + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200" + secureSuffix);
+  return res.json({ ok: true, redirectUrl: "/admin/dashboard" });
+});
+
+app.post("/admin/logout", (req, res) => {
+  const cookies = parseCookies(req);
+  const token = String(cookies.pm_admin_session || "").trim();
+  if (token) adminSessions.delete(token);
+  res.setHeader("Set-Cookie", "pm_admin_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
+  return res.json({ ok: true });
+});
+
+app.get("/admin/dashboard", requireAdminDashboard, (req, res) => {
+  const logs = listRewriteLogs(2000);
+  const summaryMap = new Map();
+  for (const row of logs) {
+    const current = summaryMap.get(row.user_email) || { email: row.user_email, count: 0, lastUsedAt: row.created_at };
+    current.count += 1;
+    if (row.created_at > current.lastUsedAt) current.lastUsedAt = row.created_at;
+    summaryMap.set(row.user_email, current);
+  }
+  const summaryRows = Array.from(summaryMap.values())
+    .sort((a, b) => b.count - a.count || String(b.lastUsedAt).localeCompare(String(a.lastUsedAt)))
+    .map((row) => `<tr><td>${safeHtml(row.email)}</td><td>${row.count}</td><td>${safeHtml(row.lastUsedAt)}</td></tr>`)
+    .join("");
+  const logRows = logs
+    .map((row) => `<tr><td>${safeHtml(row.created_at)}</td><td>${safeHtml(row.user_email)}</td><td>${safeHtml(row.tone)}</td><td>${safeHtml(row.recipient)}</td><td>${safeHtml(row.sender_role)}</td><td>${safeHtml(row.original_text)}</td><td>${safeHtml(row.rewritten_text)}</td></tr>`)
+    .join("");
+  return res.type("html").send(`<!doctype html>
+  <html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Admin Dashboard</title>
+  <style>
+    body{font-family:Pretendard,'Noto Sans KR',sans-serif;margin:0;background:#f6f8fc;color:#1c2433}
+    .wrap{max-width:1280px;margin:0 auto;padding:24px 18px 48px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .card{background:#fff;border:1px solid #d9deea;border-radius:16px;padding:18px;box-shadow:0 20px 40px -30px rgba(16,32,67,.35)}
+    h1,h2{margin:0 0 12px}
+    h1{font-size:28px} h2{font-size:20px}
+    table{width:100%;border-collapse:collapse} th,td{border:1px solid #e3e7f1;padding:8px;vertical-align:top;text-align:left;font-size:12px;line-height:1.55}
+    th{background:#eef3ff} .grid{display:grid;grid-template-columns:1fr;gap:18px;margin-top:18px}
+    button{border:0;border-radius:10px;padding:10px 14px;background:#1f4bb8;color:#fff;font-weight:700;cursor:pointer}
+  </style></head><body>
+  <div class="wrap">
+    <div class="top">
+      <div><h1>관리자 대시보드</h1><div>허용 IP와 비밀번호를 통과한 관리자만 접근 가능합니다.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="feedbackBtn" type="button" style="background:#eef3ff;color:#23438a">고객 문의</button>
+        <button id="creditsBtn" type="button" style="background:#eef3ff;color:#23438a">충전 지급</button>
+        <button id="logoutBtn" type="button">로그아웃</button>
+      </div>
+    </div>
+    <div class="grid">
+      <section class="card"><h2>사용자별 사용 횟수</h2><table><thead><tr><th>이메일</th><th>사용 횟수</th><th>최근 사용 시각</th></tr></thead><tbody>${summaryRows || '<tr><td colspan="3">아직 사용 로그가 없습니다.</td></tr>'}</tbody></table></section>
+      <section class="card"><h2>문장 변환 상세 로그</h2><table><thead><tr><th>시각</th><th>이메일</th><th>분위기</th><th>보내는 대상</th><th>본인 역할</th><th>사용한 문장</th><th>변환한 문장</th></tr></thead><tbody>${logRows || '<tr><td colspan="7">아직 로그가 없습니다.</td></tr>'}</tbody></table></section>
+    </div>
+  </div>
+  <script>
+    document.getElementById("feedbackBtn").addEventListener("click", () => {
+      location.href = "/admin/feedback";
+    });
+    document.getElementById("creditsBtn").addEventListener("click", () => {
+      location.href = "/admin/credits";
+    });
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      await fetch("/admin/logout", { method: "POST" });
+      location.href = "/billing/plans";
+    });
+  </script></body></html>`);
+});
+app.get("/admin/feedback", requireAdminDashboard, (req, res) => {
   const rows = listFeedback(500);
   const items = rows
     .map((row) => {
@@ -618,10 +775,7 @@ app.get("/admin/feedback", (req, res) => {
   </body></html>`);
 });
 
-app.post("/admin/credits/grant", (req, res) => {
-  if (!hasAdminAccess(req)) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+app.post("/admin/credits/grant", requireAdminDashboard, (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const amount = Number(req.body?.amount || 10);
   if (!email || !email.includes("@")) {
@@ -642,10 +796,7 @@ app.post("/admin/credits/grant", (req, res) => {
   });
 });
 
-app.get("/admin/credits", (req, res) => {
-  if (!hasAdminAccess(req)) {
-    return res.status(401).send("Unauthorized");
-  }
+app.get("/admin/credits", requireAdminDashboard, (req, res) => {
   return res.type("html").send(`<!doctype html>
   <html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Credits Admin</title>
@@ -832,6 +983,18 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
       outputTokens += Number(chat.usage?.completion_tokens || 0);
     }
 
+    createRewriteLog({
+      userId: user.id,
+      userEmail: user.email,
+      originalText,
+      rewrittenText: rewritten,
+      tone,
+      recipient,
+      senderRole,
+      backgroundNote,
+      harshFilterEnabled
+    });
+
     const updated = addUsage(user.id, inputTokens, outputTokens);
     if (isUnlimited) {
       // unlimited bypass account: usage metrics are recorded, quota is not consumed
@@ -938,7 +1101,7 @@ app.get("/billing/toss/checkout", (req, res) => {
       <p><b>결제금액:</b> ${order.amount.toLocaleString("ko-KR")}원</p>
       <p><b>포함 내용</b></p>
       <ul>
-        <li>Free: 하루 3회, 월 최대 15회, 1회 300자</li>
+        <li>Free: 하루 3회, 월 최대 10회, 1회 300자</li>
         <li>Pro: 월 50회, 일 30회, 1회 500자</li>
         <li>Business: 월 300회, 1회 2,000자</li>
         <li>추가 충전: 10회 1,000원</li>

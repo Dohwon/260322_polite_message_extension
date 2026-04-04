@@ -90,7 +90,13 @@
       background: currentColor;
     }
     .session-copy { margin-top: 10px; color: var(--muted); font-size: 14px; }
-    .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; padding-bottom: 18px; }
+    .hero-actions { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+    .admin-btn { border: 1px solid #d2dcf6; border-radius: 999px; padding: 10px 16px; background: rgba(255,255,255,0.9); color: #23438a; font-weight: 800; cursor: pointer; }
+    .coming-soon-banner { margin: 0 0 18px; padding: 14px 16px; border: 1px solid #d8e0f4; border-radius: 16px; background: rgba(255,255,255,0.84); color: #5a6980; font-size: 14px; }
+    .button-stack { margin-top: auto; padding-top: 18px; }
+    .coming-chip { display: inline-flex; align-items: center; margin-bottom: 10px; padding: 6px 10px; border-radius: 999px; background: #fff6e7; color: #9a5c00; font-size: 11px; font-weight: 800; }
+    .is-disabled-btn { opacity: 0.6; }
+    .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; padding-bottom: 18px; align-items: stretch; }
     .card {
       display: flex;
       flex-direction: column;
@@ -161,6 +167,9 @@
       font-weight: 600;
     }
     .plan-btn, .subtle-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       width: 100%;
       min-height: 52px;
       border: 0;
@@ -279,6 +288,9 @@
       <span class="hero-tag">Subscription Plans</span>
       <h1>충전형, 구독형 Pro / Business 요금제 비교</h1>
       <p>당신의 전문성을 더하는 정중한 메시지 작성.<br />사용량에 딱 맞는 합리적인 플랜을 선택하세요.</p>
+      <div class="hero-actions">
+        <button id="adminEntryBtn" class="admin-btn" type="button">관리자용</button>
+      </div>
       <div id="sessionBar" class="session-bar">
         <span id="sessionChip" class="chip">로그인 확인됨</span>
         <div id="sessionCopy" class="session-copy"></div>
@@ -287,6 +299,7 @@
   </section>
 
   <section class="container section">
+    <div class="coming-soon-banner">현재는 무료 버전만 먼저 운영 중입니다. 요금제 변경과 10회 추가 충전은 준비중이며, 문의 게시판으로 먼저 연락해 주세요.</div>
     <div class="cards">
       <article class="card">
         <span class="card-kicker">개인형</span>
@@ -305,8 +318,9 @@
           <span class="pill">캐주얼하게</span>
           <span class="pill">아주 정중하게</span>
         </div>
-        <div style="margin-top:18px">
-          <button id="buyProBtn" class="plan-btn" type="button">플랜 시작하기</button>
+        <div class="button-stack">
+          <span class="coming-chip">준비중</span>
+          <button id="buyProBtn" class="plan-btn is-disabled-btn" type="button">플랜 시작하기</button>
         </div>
       </article>
 
@@ -327,8 +341,9 @@
           <span class="pill">일정 변경</span>
           <span class="pill">업무 변경</span>
         </div>
-        <div style="margin-top:18px">
-          <button id="buyBusinessBtn" class="plan-btn" type="button">플랜 시작하기</button>
+        <div class="button-stack">
+          <span class="coming-chip">준비중</span>
+          <button id="buyBusinessBtn" class="plan-btn is-disabled-btn" type="button">플랜 시작하기</button>
         </div>
       </article>
 
@@ -347,8 +362,9 @@
           <span class="pill">즉시 반영</span>
           <span class="pill">추가 10회</span>
         </div>
-        <div style="margin-top:18px">
-          <button id="buyTopupBtn" class="subtle-btn" type="button">10회 충전하기</button>
+        <div class="button-stack">
+          <span class="coming-chip">준비중</span>
+          <button id="buyTopupBtn" class="subtle-btn is-disabled-btn" type="button">10회 충전하기</button>
         </div>
       </article>
     </div>
@@ -375,7 +391,7 @@
         <tbody>
           <tr><td>가격</td><td>무료</td><td>3,900원 / 월</td><td>9,900원 / 월</td></tr>
           <tr><td>일 제한</td><td>3회</td><td>30회</td><td>없음</td></tr>
-          <tr><td>월 제한</td><td>15회</td><td>50회</td><td>300회</td></tr>
+          <tr><td>월 제한</td><td>10회</td><td>50회</td><td>300회</td></tr>
           <tr><td>1회 최대 글자</td><td>300자</td><td>500자</td><td>2,000자</td></tr>
           <tr><td>배경 설명</td><td colspan="3">선택 입력, 최대 100자, 참고만 하고 직접 인용하지 않음</td></tr>
           <tr><td>추가 충전</td><td colspan="3">10회 / 1,000원, 현재 플랜의 글자수 제한 유지</td></tr>
@@ -472,30 +488,33 @@
             ? "Pro 플랜 로그인 상태"
             : "Free 로그인 상태";
         sessionChip.textContent = label;
-        sessionCopy.textContent = `${json.email} 계정으로 로그인되어 있습니다. 지금 결제하면 이 계정 기준으로 플랜과 추가 충전이 반영됩니다.`;
+        sessionCopy.textContent = ` 계정으로 로그인되어 있습니다. 현재는 이 계정 기준으로 무료 사용량이 적용되며, 유료 기능은 준비중입니다.`;
       } catch (_err) {
         // ignore
       }
     }
 
-    async function startCheckout(planId) {
-      if (!sessionToken) {
-        alert("확장 프로그램에서 Google 로그인 후 다시 열어 주세요.");
-        return;
-      }
+    function startCheckout(planId) {
+      prefillByTarget(planId);
+      alert("유료 결제는 준비중입니다. 지금은 무료 버전으로 먼저 운영 중입니다.");
+    }
+
+    document.getElementById("adminEntryBtn").addEventListener("click", async () => {
+      const password = window.prompt("관리자 비밀번호를 입력해 주세요.");
+      if (password === null) return;
       try {
-        const res = await fetch(apiBaseUrl + "/api/billing/create-checkout", {
+        const res = await fetch(apiBaseUrl + "/admin/login", {
           method: "POST",
-          headers: authHeaders(),
-          body: JSON.stringify({ planId })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password })
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "결제 시작 실패");
-        window.location.href = json.checkoutUrl;
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || "관리자 로그인 실패");
+        window.location.href = json.redirectUrl || "/admin/dashboard";
       } catch (err) {
         alert(String(err.message || err));
       }
-    }
+    });
 
     feedbackForm.addEventListener("submit", async (event) => {
       event.preventDefault();

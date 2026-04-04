@@ -170,7 +170,8 @@ function updateAuthUI() {
     els.logoutBtn.classList.toggle("hidden", !isLoggedIn);
   }
   if (els.rewriteBtn) els.rewriteBtn.disabled = !isLoggedIn;
-  if (els.topupBtn) els.topupBtn.disabled = !isLoggedIn;
+  if (els.topupBtn) els.topupBtn.disabled = false;
+  if (els.managePlanBtn) els.managePlanBtn.disabled = false;
 
   if (!isLoggedIn) {
     if (els.accountSummary) {
@@ -553,8 +554,14 @@ safeBind(els.rewriteBtn, "click", rewrite, "rewriteBtn");
 safeBind(els.resetBtn, "click", resetDraft, "resetBtn");
 safeBind(els.copyBtn, "click", copyResult, "copyBtn");
 safeBind(els.plansInfoBtn, "click", () => goPlans(""), "plansInfoBtn");
-safeBind(els.topupBtn, "click", () => goPlans("topup10"), "topupBtn");
-safeBind(els.managePlanBtn, "click", () => goPlans(""), "managePlanBtn");
+safeBind(els.topupBtn, "click", () => {
+  setStatus("유료 기능은 준비중입니다. 정책 페이지에서 내용을 먼저 확인해 주세요.", "warning");
+  goPlans("topup10");
+}, "topupBtn");
+safeBind(els.managePlanBtn, "click", () => {
+  setStatus("유료 기능은 준비중입니다. 정책 페이지에서 내용을 먼저 확인해 주세요.", "warning");
+  goPlans("");
+}, "managePlanBtn");
 safeBind(els.backgroundToggleBtn, "click", () => {
   const nextExpanded = els.backgroundWrap?.classList.contains("hidden");
   setBackgroundExpanded(nextExpanded);

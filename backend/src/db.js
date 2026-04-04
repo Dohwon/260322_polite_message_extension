@@ -68,6 +68,21 @@ CREATE TABLE IF NOT EXISTS feedback_posts (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS rewrite_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  user_email TEXT NOT NULL,
+  original_text TEXT NOT NULL,
+  rewritten_text TEXT NOT NULL,
+  tone TEXT NOT NULL,
+  recipient TEXT NOT NULL,
+  sender_role TEXT NOT NULL,
+  background_note TEXT,
+  harsh_filter_enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS free_ip_usage (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ip_hash TEXT UNIQUE NOT NULL,
@@ -232,6 +247,29 @@ const insertFeedbackStmt = db.prepare(`
 const listFeedbackStmt = db.prepare(`
   SELECT id, email, topic, message, created_at
   FROM feedback_posts
+  ORDER BY id DESC
+  LIMIT ?
+`);
+const insertRewriteLogStmt = db.prepare(`
+  INSERT INTO rewrite_logs (
+    user_id, user_email, original_text, rewritten_text, tone, recipient, sender_role, background_note, harsh_filter_enabled
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const listRewriteLogsStmt = db.prepare(`
+  SELECT
+    id,
+    user_id,
+    user_email,
+    original_text,
+    rewritten_text,
+    tone,
+    recipient,
+    sender_role,
+    background_note,
+    harsh_filter_enabled,
+    created_at
+  FROM rewrite_logs
   ORDER BY id DESC
   LIMIT ?
 `);
@@ -542,4 +580,22 @@ export function createFeedback({ email, topic, message }) {
 
 export function listFeedback(limit = 200) {
   return listFeedbackStmt.all(Number(limit) || 200);
+}
+
+export function createRewriteLog({ userId, userEmail, originalText, rewrittenText, tone, recipient, senderRole, backgroundNote, harshFilterEnabled }) {
+  insertRewriteLogStmt.run(
+    userId,
+    String(userEmail || "").trim().toLowerCase(),
+    String(originalText || "").trim(),
+    String(rewrittenText || "").trim(),
+    String(tone || "").trim(),
+    String(recipient || "").trim(),
+    String(senderRole || "").trim(),
+    String(backgroundNote || "").trim(),
+    harshFilterEnabled ? 1 : 0
+  );
+}
+
+export function listRewriteLogs(limit = 500) {
+  return listRewriteLogsStmt.all(Number(limit) || 500);
 }
