@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Feedback Admin</title>
+  <style>
+    body{font-family:Pretendard,'Noto Sans KR',sans-serif;margin:0;background:#f6f8fc;color:#1b2230}
+    .wrap{max-width:1240px;margin:0 auto;padding:24px 18px 48px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+    .top button,.action-btn{border:0;border-radius:10px;padding:10px 14px;background:#eef3ff;color:#23438a;font-weight:700;cursor:pointer}
+    h1,h2,h3{margin:0}
+    h1{font-size:28px}
+    h2{font-size:20px;margin-bottom:10px}
+    .meta{color:#5c6d87;font-size:12px}
+    .toolbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap}
+    .tab{border:1px solid #d7e0f3;border-radius:999px;padding:8px 12px;background:#fff;color:#405475;font-size:12px;font-weight:700;cursor:pointer}
+    .tab.active{background:#1f4bb8;color:#fff;border-color:#1f4bb8}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    select,input,textarea,button{font:inherit}
+    .filters select,.filters input,textarea,input[type="text"]{border:1px solid #cfd8ec;border-radius:10px;padding:10px 12px;background:#fff}
+    .filters input::placeholder, textarea::placeholder{color:#a7b3c7;font-size:11px;font-weight:400}
+    .layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:16px}
+    .card{background:#fff;border:1px solid #d9deea;border-radius:16px;padding:18px;box-shadow:0 20px 40px -30px rgba(16,32,67,.35);min-width:0}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th,td{border:1px solid #e3e7f1;padding:10px 8px;vertical-align:top;text-align:left;font-size:12px;line-height:1.5;word-break:break-word}
+    th{background:#eef3ff}
+    .list-table col.topic{width:18%}
+    .list-table col.email{width:24%}
+    .list-table col.status{width:12%}
+    .list-table col.time{width:18%}
+    .list-table col.preview{width:20%}
+    .list-table col.action{width:8%}
+    .status-chip{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800}
+    .status-chip.done{background:#e8f8ee;color:#21572f}
+    .status-chip.todo{background:#fff1f2;color:#a11b2b}
+    .detail-empty{color:#66758f;font-size:13px;padding:12px 0}
+    .message-box,.reply-item{padding:12px;border:1px solid #e3e7f1;border-radius:12px;background:#fbfcff;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+    .reply-history{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+    .reply-form{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+    .reply-form textarea{min-height:168px;resize:vertical}
+    .reply-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .reply-submit{border:0;border-radius:10px;padding:10px 14px;background:#1f4bb8;color:#fff;font-weight:700;cursor:pointer}
+    .reply-status{font-size:12px;color:#5c6d87;min-height:16px}
+    .empty{padding:18px;color:#66758f;font-size:13px;text-align:center}
+    @media (max-width: 980px){ .layout{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>고객 문의 게시판</h1>
+        <div id="summaryMeta" class="meta">불러오는 중...</div>
+      </div>
+      <div><button onclick="location.href='/admin/dashboard'">대시보드로</button></div>
+    </div>
+
+    <div class="toolbar">
+      <div id="tabs" class="tabs"></div>
+      <div class="filters">
+        <select id="replyFilter">
+          <option value="all">전체 문의</option>
+          <option value="unreplied">답장 안한 문의만</option>
+          <option value="replied">답장 완료만</option>
+        </select>
+        <input id="searchInput" placeholder="이메일 / 내용 검색" />
+      </div>
+    </div>
+
+    <div class="layout">
+      <section class="card">
+        <h2>문의 리스트</h2>
+        <table class="list-table">
+          <colgroup>
+            <col class="topic" />
+            <col class="email" />
+            <col class="status" />
+            <col class="time" />
+            <col class="preview" />
+            <col class="action" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>유형</th>
+              <th>이메일</th>
+              <th>답장 여부</th>
+              <th>접수 시각</th>
+              <th>내용</th>
+              <th>열기</th>
+            </tr>
+          </thead>
+          <tbody id="listBody"></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>문의 상세 / 답장</h2>
+        <div id="detailRoot" class="detail-empty">왼쪽 리스트에서 문의를 선택해 주세요.</div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const state = { topics: [], items: [], activeTopic: 'all', filter: 'all', selectedId: null };
+    const els = {
+      summaryMeta: document.getElementById('summaryMeta'),
+      tabs: document.getElementById('tabs'),
+      replyFilter: document.getElementById('replyFilter'),
+      searchInput: document.getElementById('searchInput'),
+      listBody: document.getElementById('listBody'),
+      detailRoot: document.getElementById('detailRoot')
+    };
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function filteredItems() {
+      const q = (els.searchInput.value || '').trim().toLowerCase();
+      return state.items.filter((item) => {
+        if (state.activeTopic !== 'all' && item.topic !== state.activeTopic) return false;
+        if (state.filter === 'unreplied' && item.replied) return false;
+        if (state.filter === 'replied' && !item.replied) return false;
+        if (!q) return true;
+        return [item.email, item.topic, item.message].some((v) => String(v || '').toLowerCase().includes(q));
+      });
+    }
+
+    function renderTabs() {
+      const tabs = [{ value: 'all', label: '전체' }, ...state.topics.map((topic) => ({ value: topic, label: topic }))];
+      els.tabs.innerHTML = tabs.map((tab) => `
+        <button type="button" class="tab ${state.activeTopic === tab.value ? 'active' : ''}" data-topic="${escapeHtml(tab.value)}">${escapeHtml(tab.label)}</button>
+      `).join('');
+      els.tabs.querySelectorAll('[data-topic]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.activeTopic = button.getAttribute('data-topic') || 'all';
+          state.selectedId = null;
+          renderList();
+          renderTabs();
+          renderDetail();
+        });
+      });
+    }
+
+    function renderList() {
+      const rows = filteredItems();
+      els.summaryMeta.textContent = `총 ${state.items.length}건 · 현재 ${rows.length}건 표시 중`;
+      els.listBody.innerHTML = rows.length ? rows.map((item) => `
+        <tr>
+          <td>${escapeHtml(item.topic)}</td>
+          <td>${escapeHtml(item.email)}</td>
+          <td><span class="status-chip ${item.replied ? 'done' : 'todo'}">${item.replied ? '답장 완료' : '미답장'}</span></td>
+          <td>${escapeHtml(item.created_at)}</td>
+          <td>${escapeHtml(String(item.message || '').slice(0, 60))}</td>
+          <td><button type="button" class="action-btn" data-open-id="${item.id}">열기</button></td>
+        </tr>
+      `).join('') : '<tr><td colspan="6" class="empty">조건에 맞는 문의가 없습니다.</td></tr>';
+      els.listBody.querySelectorAll('[data-open-id]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.selectedId = Number(button.getAttribute('data-open-id') || 0);
+          renderDetail();
+        });
+      });
+    }
+
+    function renderDetail() {
+      const item = state.items.find((row) => row.id === state.selectedId);
+      if (!item) {
+        els.detailRoot.className = 'detail-empty';
+        els.detailRoot.textContent = '왼쪽 리스트에서 문의를 선택해 주세요.';
+        return;
+      }
+      const replies = Array.isArray(item.replies) ? item.replies : [];
+      els.detailRoot.className = '';
+      els.detailRoot.innerHTML = `
+        <div class="meta">${escapeHtml(item.created_at)} · ${escapeHtml(item.email)} · ${escapeHtml(item.topic)}</div>
+        <div class="message-box" style="margin-top:12px">${escapeHtml(item.message)}</div>
+        <form id="replyForm" class="reply-form">
+          <input id="replySubject" type="text" value="${escapeHtml(`[Polite 답변] ${item.topic}`)}" />
+          <textarea id="replyMessage" placeholder="고객에게 보낼 답장을 입력해 주세요"></textarea>
+          <div class="reply-actions">
+            <button id="replySubmitBtn" type="submit" class="reply-submit">메일 답장 보내기</button>
+            <span id="replyStatus" class="reply-status"></span>
+          </div>
+        </form>
+        <div style="margin-top:18px">
+          <h3>보낸 답장</h3>
+          <div class="reply-history">${replies.length ? replies.map((reply) => `
+            <div class="reply-item"><div class="meta" style="margin-bottom:6px">${escapeHtml(reply.created_at)} · ${escapeHtml(reply.subject)}</div>${escapeHtml(reply.message)}</div>
+          `).join('') : '<div class="detail-empty">아직 보낸 답장이 없습니다.</div>'}</div>
+        </div>
+      `;
+      const form = document.getElementById('replyForm');
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const subject = document.getElementById('replySubject').value.trim();
+        const message = document.getElementById('replyMessage').value.trim();
+        const statusEl = document.getElementById('replyStatus');
+        const submitBtn = document.getElementById('replySubmitBtn');
+        submitBtn.disabled = true;
+        statusEl.textContent = '전송 중...';
+        try {
+          const res = await fetch('/admin/feedback/reply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feedbackId: item.id, to: item.email, subject, message })
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || '답장 전송 실패');
+          statusEl.textContent = json.message || '답장을 보냈습니다.';
+          alert(json.message || '답장을 보냈습니다.');
+          await loadData(item.id);
+        } catch (err) {
+          statusEl.textContent = String(err.message || err);
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    async function loadData(preferredId = null) {
+      const res = await fetch('/admin/feedback-data');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || '문의 데이터를 불러오지 못했습니다.');
+      state.topics = json.topics || [];
+      state.items = json.items || [];
+      state.selectedId = preferredId || state.selectedId || (state.items[0]?.id ?? null);
+      renderTabs();
+      renderList();
+      renderDetail();
+    }
+
+    els.replyFilter.addEventListener('change', () => {
+      state.filter = els.replyFilter.value;
+      state.selectedId = null;
+      renderList();
+      renderDetail();
+    });
+    els.searchInput.addEventListener('input', () => {
+      state.selectedId = null;
+      renderList();
+      renderDetail();
+    });
+
+    loadData().catch((err) => {
+      els.summaryMeta.textContent = String(err.message || err);
+    });
+  </script>
+</body>
+</html>

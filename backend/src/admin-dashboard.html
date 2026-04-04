@@ -21,14 +21,22 @@
     .chip{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#eef3ff;color:#23438a;font-size:12px;font-weight:700}
     .toolbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
     .toolbar .inline input,.toolbar .inline select{min-width:140px}
-    table{width:100%;border-collapse:collapse} th,td{border:1px solid #e3e7f1;padding:8px;vertical-align:top;text-align:left;font-size:12px;line-height:1.55}
+    table{width:100%;border-collapse:collapse}
+    th,td{border:1px solid #e3e7f1;padding:8px;vertical-align:top;text-align:left;font-size:12px;line-height:1.55}
     th{background:#eef3ff}
+    .summary-table{table-layout:fixed}
+    .summary-table col.email{width:42%}
+    .summary-table col.plan{width:20%}
+    .summary-table col.count{width:10%}
+    .summary-table col.time{width:28%}
+    .summary-table th.count-head{position:relative;text-align:right;padding-right:24px}
+    .summary-table td.count-cell{text-align:right;font-variant-numeric:tabular-nums}
+    .sort-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:0;border:0;background:transparent;color:#6f80a0;font-size:10px;line-height:1;font-weight:900;cursor:pointer;width:auto;height:auto}
+    .sort-toggle:hover{filter:none;color:#23438a}
     .ip-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
     .ip-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;background:#f3f6ff;color:#27406f;font-size:12px;font-weight:600}
     .ip-item button{padding:4px 8px;border-radius:999px;background:#dfe7ff;color:#23438a;font-size:11px}
     .empty{padding:18px;color:#66758f;font-size:13px;text-align:center}
-    .sort-toggle{display:inline-block;margin-left:6px;padding:0;border:0;background:transparent;color:#6f80a0;font-size:13px;font-weight:800;cursor:pointer;width:auto}
-    .sort-toggle:hover{filter:none;color:#23438a}
   </style>
 </head>
 <body>
@@ -67,18 +75,24 @@
         <div class="toolbar">
           <div>
             <h2>사용자별 사용 횟수</h2>
-            <div class="muted">이메일 또는 사용 횟수로 검색할 수 있습니다.</div>
+            <div class="muted">이메일, 요금제, 사용 횟수로 검색할 수 있습니다.</div>
           </div>
           <div class="inline">
-            <input id="summarySearch" placeholder="이메일 / 사용 횟수 검색" />
+            <input id="summarySearch" placeholder="이메일 / 요금제 / 사용 횟수 검색" />
           </div>
         </div>
-        <table>
+        <table class="summary-table">
+          <colgroup>
+            <col class="email" />
+            <col class="plan" />
+            <col class="count" />
+            <col class="time" />
+          </colgroup>
           <thead>
             <tr>
               <th>이메일</th>
               <th>요금제</th>
-              <th>사용 횟수 <button id="countSortToggle" type="button" class="sort-toggle" aria-label="사용 횟수 정렬">▼</button></th>
+              <th class="count-head">사용 횟수 <button id="countSortToggle" type="button" class="sort-toggle" aria-label="사용 횟수 정렬">▼</button></th>
               <th>최근 사용 시각</th>
             </tr>
           </thead>
@@ -173,7 +187,7 @@
         : Number(b.count || 0) - Number(a.count || 0) || String(a.email || "").localeCompare(String(b.email || "")));
       els.countSortToggle.textContent = state.summarySort === "asc" ? "▲" : "▼";
       els.summaryTbody.innerHTML = rows.length
-        ? rows.map((row) => `<tr><td>${escapeHtml(row.email)}</td><td>${escapeHtml(row.planName)}</td><td>${row.count}</td><td>${escapeHtml(row.lastUsedAt)}</td></tr>`).join("")
+        ? rows.map((row) => `<tr><td>${escapeHtml(row.email)}</td><td>${escapeHtml(row.planName)}</td><td class="count-cell">${row.count}</td><td>${escapeHtml(row.lastUsedAt)}</td></tr>`).join("")
         : '<tr><td colspan="4" class="empty">조건에 맞는 사용 기록이 없습니다.</td></tr>';
     }
 

@@ -1,11 +1,14 @@
 import Database from "better-sqlite3";
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dbPath = path.join(__dirname, "..", "data.sqlite");
+const defaultDbPath = path.join(__dirname, "..", "data.sqlite");
+const dbPath = process.env.DB_PATH ? path.resolve(process.env.DB_PATH) : defaultDbPath;
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");

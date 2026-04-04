@@ -56,6 +56,7 @@ const __dirname = path.dirname(__filename);
 const plansLandingPath = path.join(__dirname, "plans-landing.html");
 const adminDashboardPath = path.join(__dirname, "admin-dashboard.html");
 const adminCreditsPath = path.join(__dirname, "admin-credits.html");
+const adminFeedbackPath = path.join(__dirname, "admin-feedback.html");
 const oauthPendingStates = new Map();
 const oauthDeviceResults = new Map();
 const adminSessions = new Map();
@@ -692,18 +693,23 @@ app.post("/api/feedback", async (req, res) => {
   if (!message || message.length < 3) {
     return res.status(400).json({ error: "문의 내용을 3자 이상 입력해 주세요." });
   }
+
   createFeedback({ email, topic, message });
+
   try {
     const mail = await notifyFeedbackByEmail({ email, topic, message });
-    if (!mail.delivered) {
-      return res.status(503).json({
-        error: "문의는 저장되었지만 운영 메일 설정이 아직 완료되지 않았습니다. Gmail 앱 비밀번호(SMTP_PASS)를 먼저 넣어 주세요."
-      });
-    }
-    return res.json({ ok: true, emailDelivered: mail.delivered });
-  } catch (err) {
-    return res.status(500).json({
-      error: "문의는 저장되었지만 이메일 전달에 실패했습니다. 잠시 후 다시 시도해 주세요."
+    return res.json({
+      ok: true,
+      emailDelivered: Boolean(mail.delivered),
+      message: mail.delivered
+        ? "문의가 정상 접수되었습니다. 확인 후 답장을 보내드릴게요."
+        : "문의가 정상 접수되었습니다. 운영 메일 알림 설정은 아직 마무리 중이지만, 관리자 화면에는 바로 저장되었습니다."
+    });
+  } catch (_err) {
+    return res.json({
+      ok: true,
+      emailDelivered: false,
+      message: "문의가 정상 접수되었습니다. 확인 후 답장을 보내드릴게요."
     });
   }
 });
@@ -776,8 +782,12 @@ app.get("/admin/dashboard", requireAdminDashboard, (_req, res) => {
   return res.sendFile(adminDashboardPath);
 });
 
-app.get("/admin/feedback", requireAdminDashboard, (req, res) => {
-  const rows = listFeedback(500);
+app.get("/admin/feedback", requireAdminDashboard, (_req, res) => {
+  return res.sendFile(adminFeedbackPath);
+});
+
+app.get("/admin/feedback-data", requireAdminDashboard, (_req, res) => {
+  const rows = listFeedback(1000);
   const replies = listFeedbackReplies();
   const repliesByFeedbackId = new Map();
   for (const reply of replies) {
@@ -787,108 +797,27 @@ app.get("/admin/feedback", requireAdminDashboard, (req, res) => {
     repliesByFeedbackId.set(key, bucket);
   }
 
-  const items = rows
-    .map((row) => {
-      const sentReplies = repliesByFeedbackId.get(Number(row.id)) || [];
-      const replyHistory = sentReplies.length > 0
-        ? `<div class="reply-history">${sentReplies
-            .map(
-              (reply) => `<div class="reply-item"><div class="reply-meta">${safeHtml(reply.created_at)} · ${safeHtml(reply.subject)}</div><div>${safeHtml(reply.message).replace(/\n/g, "<br />")}</div></div>`
-            )
-            .join("")}</div>`
-        : `<div class="reply-empty">아직 보낸 답장이 없습니다.</div>`;
-      const defaultSubject = `[Polite 답변] ${row.topic}`;
-      return `
-      <section class="feedback-card">
-        <div class="feedback-head">
-          <div>
-            <h2>${safeHtml(row.topic)}</h2>
-            <div class="meta">${safeHtml(row.created_at)} · ${safeHtml(row.email)}</div>
-          </div>
-        </div>
-        <div class="feedback-message">${safeHtml(row.message).replace(/\n/g, "<br />")}</div>
-        <div class="reply-block">
-          <div>
-            <h3>답장 보내기</h3>
-            <form class="reply-form" data-feedback-id="${row.id}" data-email="${safeHtml(row.email)}">
-              <input name="subject" value="${safeHtml(defaultSubject)}" required />
-              <textarea name="message" rows="5" placeholder="고객에게 보낼 답장을 입력해 주세요" required></textarea>
-              <div class="reply-actions">
-                <button type="submit">메일 답장 보내기</button>
-                <span class="reply-status"></span>
-              </div>
-            </form>
-          </div>
-          <div class="reply-history-wrap">
-            <h3>보낸 답장</h3>
-            ${replyHistory}
-          </div>
-        </div>
-      </section>`;
-    })
-    .join("");
+  const items = rows.map((row) => {
+    const replyItems = repliesByFeedbackId.get(Number(row.id)) || [];
+    const latestReplyAt = replyItems.length > 0 ? replyItems[0].created_at : "";
+    return {
+      id: Number(row.id),
+      email: row.email,
+      topic: row.topic,
+      message: row.message,
+      created_at: row.created_at,
+      replied: replyItems.length > 0,
+      reply_count: replyItems.length,
+      latest_reply_at: latestReplyAt,
+      replies: replyItems
+    };
+  });
 
-  return res.type("html").send(`<!doctype html>
-  <html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Feedback Admin</title>
-  <style>
-  body{font-family:Pretendard,'Noto Sans KR',sans-serif;margin:0;background:#f6f8fc;color:#1b2230}
-  .wrap{max-width:1080px;margin:0 auto;padding:24px 18px 48px}
-  .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
-  .top button{border:0;border-radius:10px;padding:10px 14px;background:#eef3ff;color:#23438a;font-weight:700;cursor:pointer}
-  .feedback-card{border:1px solid #d9deea;border-radius:16px;padding:18px;background:#fff;box-shadow:0 20px 40px -30px rgba(16,32,67,.35);margin-bottom:16px}
-  h1,h2,h3{margin:0} h1{font-size:28px} h2{font-size:20px;margin-bottom:6px} h3{font-size:15px;margin-bottom:8px}
-  .meta,.reply-empty,.reply-meta{color:#5c6d87;font-size:12px}
-  .feedback-message{margin-top:14px;padding:14px;border-radius:12px;background:#f7f9ff;line-height:1.7}
-  .reply-block{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-top:16px}
-  input,textarea,button{font:inherit}
-  input,textarea{width:100%;border:1px solid #cfd8ec;border-radius:10px;padding:10px 12px;background:#fff}
-  textarea{resize:vertical}
-  .reply-form{display:flex;flex-direction:column;gap:10px}
-  .reply-actions{display:flex;align-items:center;gap:10px}
-  .reply-actions button{border:0;border-radius:10px;padding:10px 14px;background:#1f4bb8;color:#fff;font-weight:700;cursor:pointer}
-  .reply-status{font-size:12px;color:#5c6d87}
-  .reply-history{display:flex;flex-direction:column;gap:10px}
-  .reply-item{padding:12px;border:1px solid #e3e7f1;border-radius:12px;background:#fbfcff;line-height:1.65}
-  @media (max-width: 860px){ .reply-block{grid-template-columns:1fr} }
-  </style></head><body>
-  <div class="wrap">
-    <div class="top">
-      <div>
-        <h1>고객 문의 게시판</h1>
-        <div class="meta">총 ${rows.length}건</div>
-      </div>
-      <div><button onclick="location.href='/admin/dashboard'">대시보드로</button></div>
-    </div>
-    ${items || '<div class="feedback-card">문의가 없습니다.</div>'}
-  </div>
-  <script>
-    document.querySelectorAll('.reply-form').forEach((form) => {
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const feedbackId = Number(form.dataset.feedbackId || 0);
-        const to = String(form.dataset.email || '');
-        const subject = form.querySelector('input[name="subject"]').value.trim();
-        const message = form.querySelector('textarea[name="message"]').value.trim();
-        const statusEl = form.querySelector('.reply-status');
-        statusEl.textContent = '전송 중...';
-        try {
-          const res = await fetch('/admin/feedback/reply', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ feedbackId, to, subject, message })
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || '답장 전송 실패');
-          statusEl.textContent = '답장을 보냈습니다. 새로고침합니다.';
-          setTimeout(() => location.reload(), 800);
-        } catch (err) {
-          statusEl.textContent = String(err.message || err);
-        }
-      });
-    });
-  </script>
-  </body></html>`);
+  return res.json({
+    ok: true,
+    topics: Array.from(FEEDBACK_TOPICS),
+    items
+  });
 });
 
 app.post("/admin/feedback/reply", requireAdminDashboard, async (req, res) => {
@@ -921,7 +850,7 @@ app.post("/admin/feedback/reply", requireAdminDashboard, async (req, res) => {
   }
 
   createFeedbackReply({ feedbackId, recipientEmail: to, subject, message });
-  return res.json({ ok: true });
+  return res.json({ ok: true, message: "답장을 보냈습니다." });
 });
 
 app.post("/admin/credits/grant", requireAdminDashboard, (req, res) => {

@@ -23,6 +23,7 @@ export const env = {
   smtpSecure: String(process.env.SMTP_SECURE || "true").toLowerCase() === "true",
   smtpUser: process.env.SMTP_USER || "",
   smtpPass: process.env.SMTP_PASS || "",
+  dbPath: process.env.DB_PATH || "",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
