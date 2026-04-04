@@ -178,8 +178,9 @@ function updateAuthUI() {
   const loginPending = state.isPollingGoogleLogin;
 
   if (els.googleLoginBtn) {
-    els.googleLoginBtn.disabled = isLoggedIn || loginPending;
+    els.googleLoginBtn.disabled = isLoggedIn;
     els.googleLoginBtn.classList.toggle("hidden", isLoggedIn);
+    els.googleLoginBtn.textContent = loginPending ? "Google 다시 열기" : "Google로 시작";
   }
   if (els.logoutBtn) {
     els.logoutBtn.disabled = !isLoggedIn;
@@ -403,20 +404,20 @@ async function resumePendingGoogleLoginIfExists(pendingGoogleDeviceId, pendingGo
     return;
   }
 
-  await pollGoogleLogin(pendingGoogleDeviceId, { silent: true });
+  pollGoogleLogin(pendingGoogleDeviceId, { silent: true }).catch(() => {});
 }
 
 async function loginWithGoogle() {
   try {
+    if (state.isPollingGoogleLogin) {
+      await clearPendingGoogleLogin();
+    }
     const deviceId = createDeviceId();
 
     await chrome.storage.local.set({
       [STORAGE_KEYS.pendingGoogleDeviceId]: deviceId,
       [STORAGE_KEYS.pendingGoogleStartedAt]: Date.now()
     });
-
-    state.isPollingGoogleLogin = true;
-    updateAuthUI();
 
     setAuthStatus("Google 로그인 창을 여는 중...", "success");
     setStatus("브라우저 탭에서 Google 로그인을 완료해 주세요. 창을 닫아도 다시 열면 자동 연결됩니다.");

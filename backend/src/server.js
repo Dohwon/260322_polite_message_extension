@@ -398,7 +398,7 @@ function isAllowedAdminIp(req) {
 
 function createAdminSession(req) {
   const token = crypto.createHash("sha256").update(`${env.adminSessionSecret || env.ipQuotaSalt}:${Date.now()}:${Math.random()}`).digest("hex");
-  adminSessions.set(token, { ip: getClientIp(req), expiresAtMs: Date.now() + 12 * 60 * 60 * 1000 });
+  adminSessions.set(token, { expiresAtMs: Date.now() + 12 * 60 * 60 * 1000 });
   return token;
 }
 
@@ -419,10 +419,6 @@ function requireAdminDashboard(req, res, next) {
   const session = token ? adminSessions.get(token) : null;
   if (!session) {
     return res.status(401).send("관리자 로그인이 필요합니다.");
-  }
-  if (session.ip && session.ip !== getClientIp(req)) {
-    adminSessions.delete(token);
-    return res.status(401).send("관리자 세션이 만료되었습니다.");
   }
   return next();
 }
