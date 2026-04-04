@@ -114,9 +114,11 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script>
     const PAGE_SIZE = 20;
     const state = { topics: [], items: [], activeTopic: 'all', filter: 'all', selectedId: null, currentPage: 1 };
+    let emailConfig = null;
     const els = {
       summaryMeta: document.getElementById('summaryMeta'),
       tabs: document.getElementById('tabs'),
@@ -128,6 +130,31 @@
       prevPageBtn: document.getElementById('prevPageBtn'),
       nextPageBtn: document.getElementById('nextPageBtn')
     };
+
+    async function loadEmailConfig() {
+      try {
+        const res = await fetch('/api/meta');
+        const json = await res.json();
+        if (!res.ok) return;
+        emailConfig = json?.email?.emailjs || null;
+        if (emailConfig?.enabled && window.emailjs?.init) {
+          window.emailjs.init({ publicKey: emailConfig.publicKey });
+        }
+      } catch (_err) {
+        emailConfig = null;
+      }
+    }
+
+    async function sendReplyEmail(item, subject, message) {
+      if (!emailConfig?.enabled || !window.emailjs?.send) {
+        throw new Error('EmailJS 설정을 찾지 못했습니다.');
+      }
+      await window.emailjs.send(emailConfig.serviceId, emailConfig.replyTemplateId, {
+        to_email: item.email,
+        subject,
+        message
+      });
+    }
 
     function escapeHtml(value) {
       return String(value || '')
@@ -241,10 +268,11 @@
         submitBtn.disabled = true;
         statusEl.textContent = '전송 중...';
         try {
+          await sendReplyEmail(item, subject, message);
           const res = await fetch('/admin/feedback/reply', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ feedbackId: item.id, to: item.email, subject, message })
+            body: JSON.stringify({ feedbackId: item.id, to: item.email, subject, message, deliveryMethod: 'emailjs' })
           });
           const json = await res.json();
           if (!res.ok) throw new Error(json.error || '답장 전송 실패');
@@ -298,7 +326,7 @@
       renderDetail();
     });
 
-    loadData().catch((err) => {
+    Promise.all([loadEmailConfig(), loadData()]).catch((err) => {
       els.summaryMeta.textContent = String(err.message || err);
     });
   </script>

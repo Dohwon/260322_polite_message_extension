@@ -530,11 +530,13 @@
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const target = params.get("target") || "";
     const sessionToken = params.get("sessionToken") || "";
     const apiBaseUrl = window.location.origin;
+    let emailConfig = null;
 
     const sessionBar = document.getElementById("sessionBar");
     const sessionChip = document.getElementById("sessionChip");
@@ -558,6 +560,30 @@
         feedbackTopicEl.value = "충전 문의";
         feedbackMsgEl.value = "10회 추가 충전 관련 문의입니다.\n";
       }
+    }
+
+    async function loadEmailConfig() {
+      try {
+        const res = await fetch(apiBaseUrl + "/api/meta");
+        const json = await res.json();
+        if (!res.ok) return;
+        emailConfig = json?.email?.emailjs || null;
+        if (emailConfig?.enabled && window.emailjs?.init) {
+          window.emailjs.init({ publicKey: emailConfig.publicKey });
+        }
+      } catch (_err) {
+        emailConfig = null;
+      }
+    }
+
+    async function sendFeedbackNoticeEmail(payload) {
+      if (!emailConfig?.enabled || !window.emailjs?.send) return { ok: false, skipped: true };
+      await window.emailjs.send(emailConfig.serviceId, emailConfig.feedbackTemplateId, {
+        topic: payload.topic,
+        reply_to: payload.email,
+        message: payload.message
+      });
+      return { ok: true };
     }
 
     async function refreshSessionCard() {
@@ -609,7 +635,8 @@
         const payload = {
           email: document.getElementById("feedbackEmail").value.trim(),
           topic: feedbackTopicEl.value.trim(),
-          message: feedbackMsgEl.value.trim()
+          message: feedbackMsgEl.value.trim(),
+          deliveryMethod: "emailjs"
         };
         const res = await fetch(apiBaseUrl + "/api/feedback", {
           method: "POST",
@@ -618,6 +645,7 @@
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "문의 접수 실패");
+        await sendFeedbackNoticeEmail(payload);
         feedbackForm.reset();
         feedbackNotice.className = "notice success";
         feedbackNotice.textContent = String(json.message || "문의가 정상 접수되었습니다. 확인 후 답장을 보내드릴게요.");
@@ -631,6 +659,7 @@
     });
 
     prefillByTarget(target);
+    loadEmailConfig();
     refreshSessionCard();
   </script>
 </body>

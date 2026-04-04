@@ -587,6 +587,21 @@ app.get("/api/meta", (_req, res) => {
       hasPlanPrices: true,
       hasTopupPrice: true
     },
+    email: {
+      provider: env.mailProvider,
+      emailjs: {
+        enabled: Boolean(
+          env.emailjsServiceId &&
+          env.emailjsTemplateFeedbackId &&
+          env.emailjsTemplateReplyId &&
+          env.emailjsPublicKey
+        ),
+        serviceId: env.emailjsServiceId,
+        feedbackTemplateId: env.emailjsTemplateFeedbackId,
+        replyTemplateId: env.emailjsTemplateReplyId,
+        publicKey: env.emailjsPublicKey
+      }
+    },
     auth: {
       provider: "google",
       passwordLoginEnabled: false,
@@ -779,6 +794,7 @@ app.post("/api/feedback", async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const topic = String(req.body?.topic || "").trim();
   const message = String(req.body?.message || "").trim();
+  const deliveryMethod = String(req.body?.deliveryMethod || "").trim().toLowerCase();
   if (!email || !email.includes("@")) {
     return res.status(400).json({ error: "유효한 이메일을 입력해 주세요." });
   }
@@ -790,6 +806,13 @@ app.post("/api/feedback", async (req, res) => {
   }
 
   createFeedback({ email, topic, message });
+  if (deliveryMethod === "emailjs" || env.mailProvider === "emailjs") {
+    return res.json({
+      ok: true,
+      emailDelivered: null,
+      message: "문의가 정상 접수되었습니다. 확인 후 답장을 보내드릴게요."
+    });
+  }
   sendFeedbackNotifyInBackground({ email, topic, message });
   return res.json({
     ok: true,
@@ -909,6 +932,7 @@ app.post("/admin/feedback/reply", requireAdminDashboard, async (req, res) => {
   const to = String(req.body?.to || "").trim().toLowerCase();
   const subject = String(req.body?.subject || "").trim();
   const message = String(req.body?.message || "").trim();
+  const deliveryMethod = String(req.body?.deliveryMethod || "").trim().toLowerCase();
 
   if (!Number.isFinite(feedbackId) || feedbackId <= 0) {
     return res.status(400).json({ error: "유효한 문의 ID가 필요합니다." });
@@ -926,6 +950,11 @@ app.post("/admin/feedback/reply", requireAdminDashboard, async (req, res) => {
   const feedback = listFeedback(5000).find((row) => Number(row.id) === feedbackId);
   if (!feedback) {
     return res.status(404).json({ error: "원본 문의를 찾을 수 없습니다." });
+  }
+
+  if (deliveryMethod === "emailjs" || env.mailProvider === "emailjs") {
+    createFeedbackReply({ feedbackId, recipientEmail: to, subject, message });
+    return res.json({ ok: true, message: "답장을 보냈습니다." });
   }
 
   const mail = await sendFeedbackReplyEmail({ to, subject, message });

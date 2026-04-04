@@ -15,8 +15,12 @@ export const env = {
   ipQuotaSalt: process.env.IP_QUOTA_SALT || "local-dev-ip-quota-salt-change-me",
   unlimitedBypassEmails:
     process.env.UNLIMITED_BYPASS_EMAILS || "dowonkim0612@gmail.com",
-  mailProvider: String(process.env.MAIL_PROVIDER || "brevo").toLowerCase(),
+  mailProvider: String(process.env.MAIL_PROVIDER || "emailjs").toLowerCase(),
   feedbackNotifyEmail: process.env.FEEDBACK_NOTIFY_EMAIL || "politemsg.support@gmail.com",
+  emailjsServiceId: process.env.EMAILJS_SERVICE_ID || "service_rlh0xic",
+  emailjsTemplateFeedbackId: process.env.EMAILJS_TEMPLATE_FEEDBACK_ID || "template_64r2slq",
+  emailjsTemplateReplyId: process.env.EMAILJS_TEMPLATE_REPLY_ID || "template_m0b38lo",
+  emailjsPublicKey: process.env.EMAILJS_PUBLIC_KEY || "PeQjkuhx_7X2HlgSr",
   brevoApiKey: process.env.BREVO_API_KEY || "",
   brevoSenderEmail: process.env.BREVO_SENDER_EMAIL || "",
   brevoSenderName: process.env.BREVO_SENDER_NAME || "Polite Message",
