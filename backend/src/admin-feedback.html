@@ -156,6 +156,17 @@
       });
     }
 
+    function humanizeError(err) {
+      if (!err) return '알 수 없는 오류가 발생했습니다.';
+      if (typeof err === 'string') return err;
+      if (typeof err.message === 'string' && err.message.trim()) return err.message.trim();
+      if (typeof err.text === 'string' && err.text.trim()) return err.text.trim();
+      if (typeof err.status === 'number') {
+        return `메일 전송 서비스 오류(${err.status})가 발생했습니다.`;
+      }
+      return '메일 전송 중 오류가 발생했습니다.';
+    }
+
     function escapeHtml(value) {
       return String(value || '')
         .replaceAll('&', '&amp;')
@@ -280,7 +291,7 @@
           alert(json.message || '답장을 보냈습니다.');
           await loadData(item.id);
         } catch (err) {
-          statusEl.textContent = String(err.message || err);
+          statusEl.textContent = humanizeError(err);
         } finally {
           submitBtn.disabled = false;
         }
@@ -327,7 +338,7 @@
     });
 
     Promise.all([loadEmailConfig(), loadData()]).catch((err) => {
-      els.summaryMeta.textContent = String(err.message || err);
+      els.summaryMeta.textContent = humanizeError(err);
     });
   </script>
 </body>
