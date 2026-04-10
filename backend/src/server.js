@@ -41,7 +41,7 @@ import {
   setUserSession,
   updatePlan
 } from "./db.js";
-import { buildRewritePrompt, sanitizeRecipient, sanitizeTone } from "./prompt.js";
+import { buildRewritePrompt, sanitizeOutputLanguage, sanitizeRecipient, sanitizeTone } from "./prompt.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -1077,6 +1077,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   const originalText = String(req.body?.originalText || "").trim();
   const tone = sanitizeTone(req.body?.tone);
   const recipient = sanitizeRecipient(req.body?.recipient);
+  const outputLanguage = sanitizeOutputLanguage(req.body?.outputLanguage);
   const senderRole = String(req.body?.senderRole || "발신자").trim();
   const backgroundNote = String(req.body?.backgroundNote || "").trim().slice(0, 100);
   const harshFilterEnabled = Boolean(req.body?.harshFilterEnabled ?? true);
@@ -1118,6 +1119,7 @@ app.post("/api/rewrite", rewriteLimiter, auth, async (req, res) => {
   }
 
   const { system, context } = buildRewritePrompt({
+    outputLanguage,
     tone,
     recipient,
     senderRole,

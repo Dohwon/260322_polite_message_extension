@@ -108,3 +108,5 @@ export const TONES = [
 ];
 
 export const RECIPIENTS = ["상사", "동료", "친구", "학부모", "고객", "거래처", "연인", "가족", "기타"];
+
+export const OUTPUT_LANGUAGES = ["ko", "en"];

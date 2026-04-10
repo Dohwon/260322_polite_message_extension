@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   sessionToken: "sessionToken",
   pendingGoogleDeviceId: "pendingGoogleDeviceId",
   pendingGoogleStartedAt: "pendingGoogleStartedAt",
+  outputLanguage: "outputLanguage",
   tone: "tone",
   recipient: "recipient",
   senderRole: "senderRole",
@@ -27,6 +28,7 @@ const els = {
   managePlanBtn: document.getElementById("managePlanBtn"),
   topupBtn: document.getElementById("topupBtn"),
   planPreviewOverlayBtn: document.getElementById("planPreviewOverlayBtn"),
+  outputLanguage: document.getElementById("outputLanguage"),
   tone: document.getElementById("tone"),
   recipient: document.getElementById("recipient"),
   senderRole: document.getElementById("senderRole"),
@@ -51,6 +53,15 @@ const state = {
   isPollingGoogleLogin: false,
   autoReloginTriggered: false
 };
+
+function setButtonLabel(element, primary, secondary = "") {
+  if (!element) return;
+  const safePrimary = primary || "";
+  const safeSecondary = secondary || "";
+  element.innerHTML = safeSecondary
+    ? `${safePrimary}<span class="btn-sub">${safeSecondary}</span>`
+    : safePrimary;
+}
 
 function setStatus(message, variant = "info") {
   if (!els.status) return;
@@ -132,7 +143,11 @@ function updateBackgroundMeta() {
 function setBackgroundExpanded(expanded) {
   if (!els.backgroundWrap || !els.backgroundToggleBtn) return;
   els.backgroundWrap.classList.toggle("hidden", !expanded);
-  els.backgroundToggleBtn.textContent = expanded ? "상황 설명 접기" : "상황 설명 추가";
+  setButtonLabel(
+    els.backgroundToggleBtn,
+    expanded ? "상황 설명 접기" : "상황 설명 추가",
+    expanded ? "Hide context" : "Add context"
+  );
 }
 
 function usageText(user) {
@@ -175,6 +190,22 @@ function authHeaders() {
   };
 }
 
+function buildBackgroundNoteForRequest() {
+  const userNote = els.backgroundNote?.value?.trim() || "";
+  const outputLanguage = els.outputLanguage?.value || "ko";
+
+  if (outputLanguage !== "en") {
+    return userNote;
+  }
+
+  const englishDirective = "언어 규칙: 최종 결과는 반드시 영어로만 작성. 한국어 금지.";
+  if (!userNote) {
+    return englishDirective;
+  }
+
+  return `${englishDirective} ${userNote}`.slice(0, 100);
+}
+
 function updateAuthUI() {
   const isLoggedIn = Boolean(state.user);
   const loginPending = state.isPollingGoogleLogin;
@@ -182,7 +213,11 @@ function updateAuthUI() {
   if (els.googleLoginBtn) {
     els.googleLoginBtn.disabled = isLoggedIn;
     els.googleLoginBtn.classList.toggle("hidden", isLoggedIn);
-    els.googleLoginBtn.textContent = loginPending ? "Google 다시 열기" : "Google로 시작";
+    setButtonLabel(
+      els.googleLoginBtn,
+      loginPending ? "Google 다시 열기" : "Google로 시작",
+      loginPending ? "Open again" : "Sign in"
+    );
   }
   if (els.logoutBtn) {
     els.logoutBtn.disabled = !isLoggedIn;
@@ -221,6 +256,7 @@ function updateAuthUI() {
 
 async function saveLocalState() {
   await chrome.storage.sync.set({
+    [STORAGE_KEYS.outputLanguage]: els.outputLanguage?.value || "ko",
     [STORAGE_KEYS.tone]: els.tone?.value || "정중하게",
     [STORAGE_KEYS.recipient]: els.recipient?.value || "기타",
     [STORAGE_KEYS.senderRole]: els.senderRole?.value?.trim() || "",
@@ -247,6 +283,7 @@ async function saveDraftTexts() {
 
 async function loadLocalState() {
   const sync = await chrome.storage.sync.get([
+    STORAGE_KEYS.outputLanguage,
     STORAGE_KEYS.tone,
     STORAGE_KEYS.recipient,
     STORAGE_KEYS.senderRole,
@@ -263,6 +300,7 @@ async function loadLocalState() {
     STORAGE_KEYS.draftRewrittenText
   ]);
 
+  if (els.outputLanguage) els.outputLanguage.value = sync[STORAGE_KEYS.outputLanguage] || "ko";
   if (els.tone) els.tone.value = sync[STORAGE_KEYS.tone] || "정중하게";
   if (els.recipient) els.recipient.value = sync[STORAGE_KEYS.recipient] || "기타";
   if (els.senderRole) els.senderRole.value = sync[STORAGE_KEYS.senderRole] || "";
@@ -492,10 +530,11 @@ async function rewrite() {
       headers: authHeaders(),
       body: JSON.stringify({
         originalText: els.originalText?.value?.trim() || "",
+        outputLanguage: els.outputLanguage?.value || "ko",
         tone: els.tone?.value || "정중하게",
         recipient: els.recipient?.value || "기타",
         senderRole: els.senderRole?.value?.trim() || "발신자",
-        backgroundNote: els.backgroundNote?.value?.trim() || "",
+        backgroundNote: buildBackgroundNoteForRequest(),
         harshFilterEnabled: Boolean(els.harshFilterEnabled?.checked)
       })
     });
@@ -590,6 +629,7 @@ safeBind(els.backgroundNote, "input", () => {
   updateBackgroundMeta();
   saveLocalState().catch(() => {});
 }, "backgroundNote");
+safeBind(els.outputLanguage, "change", () => saveLocalState().catch(() => {}), "outputLanguage");
 safeBind(els.tone, "change", () => saveLocalState().catch(() => {}), "tone");
 safeBind(els.recipient, "change", () => saveLocalState().catch(() => {}), "recipient");
 safeBind(els.senderRole, "input", () => saveLocalState().catch(() => {}), "senderRole");

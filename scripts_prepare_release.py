@@ -5,9 +5,33 @@ from pathlib import Path
 import zipfile
 import sys
 
-ROOT = Path('/home/dowon/securedir/git/codex/projects/260322_polite_message_extension')
+ROOT = Path(__file__).resolve().parent
 EXT = ROOT / 'extension'
 OUT_DIR = ROOT / 'dist'
+
+
+def iter_release_files(manifest: dict) -> list[Path]:
+    files = [
+        EXT / 'popup.html',
+        EXT / 'popup.js',
+        EXT / 'popup.css'
+    ]
+
+    icon_paths = set()
+    for key in ('icons',):
+      icon_paths.update((manifest.get(key) or {}).values())
+    action = manifest.get('action') or {}
+    icon_paths.update((action.get('default_icon') or {}).values())
+
+    for icon_path in sorted(icon_paths):
+        files.append(EXT / icon_path)
+
+    missing = [str(path.relative_to(ROOT)) for path in files if not path.is_file()]
+    if missing:
+        missing_list = ", ".join(missing)
+        raise FileNotFoundError(f"Required release files are missing: {missing_list}")
+
+    return files
 
 
 def main() -> int:
@@ -31,13 +55,9 @@ def main() -> int:
 
     zip_path = OUT_DIR / f'polite-message-extension-{api_domain}.zip'
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for p in EXT.rglob('*'):
-            if p.is_file():
-                arc = p.relative_to(EXT)
-                if arc.as_posix() == 'manifest.json':
-                    zf.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False, indent=2))
-                else:
-                    zf.write(p, arc.as_posix())
+        zf.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False, indent=2))
+        for p in iter_release_files(manifest):
+            zf.write(p, p.relative_to(EXT).as_posix())
 
     print(f'Release package created: {zip_path}')
     print(f'Release manifest preview: {release_manifest}')

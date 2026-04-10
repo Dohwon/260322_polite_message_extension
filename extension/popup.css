@@ -100,6 +100,21 @@ label {
   font-weight: 600;
 }
 
+.label-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #7a869a;
+  letter-spacing: 0.01em;
+}
+
+.label-sub.inline-sub {
+  display: inline;
+  margin-top: 0;
+  margin-left: 4px;
+}
+
 .label-row {
   display: flex;
   justify-content: space-between;
@@ -232,6 +247,19 @@ button {
   color: #fff;
   cursor: pointer;
   font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.1;
+}
+
+.btn-sub {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.82;
+  letter-spacing: 0.01em;
 }
 
 button:hover {

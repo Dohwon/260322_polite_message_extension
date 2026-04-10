@@ -13,95 +13,101 @@
       </header>
 
       <section class="card auth-card">
-        <label>계정</label>
+        <label>계정 <span class="label-sub">Account</span></label>
         <div class="account-row">
           <p id="accountSummary" class="sub">Google 계정으로 로그인해 주세요.</p>
           <p id="authStatus" class="mini-chip"></p>
         </div>
         <div class="actions">
-          <button id="googleLoginBtn" type="button">Google로 시작</button>
-          <button id="logoutBtn" type="button" class="ghost">로그아웃</button>
+          <button id="googleLoginBtn" type="button">Google로 시작<span class="btn-sub">Sign in</span></button>
+          <button id="logoutBtn" type="button" class="ghost">로그아웃<span class="btn-sub">Log out</span></button>
         </div>
       </section>
 
       <section class="card plans-card">
         <div class="label-row">
-          <label>요금제</label>
+          <label>요금제 <span class="label-sub">Plan</span></label>
           <button id="plansInfoBtn" type="button" class="icon-btn" title="요금제 정책 보기">?</button>
         </div>
         <p id="planSummary" class="sub">로그인하면 현재 플랜 상태를 확인할 수 있습니다.</p>
         <div class="plan-actions-wrap">
           <div class="actions secondary">
-            <button id="topupBtn" type="button" class="ghost">10회 추가</button>
-            <button id="managePlanBtn" type="button" class="ghost">요금제 변경</button>
+            <button id="topupBtn" type="button" class="ghost">10회 추가<span class="btn-sub">Add 10 uses</span></button>
+            <button id="managePlanBtn" type="button" class="ghost">요금제 변경<span class="btn-sub">Change plan</span></button>
           </div>
-          <button id="planPreviewOverlayBtn" type="button" class="plan-preview-overlay">요금제 미리보기</button>
+          <button id="planPreviewOverlayBtn" type="button" class="plan-preview-overlay">요금제 미리보기<span class="btn-sub">Preview plans</span></button>
         </div>
       </section>
 
       <section class="card">
-        <label for="tone">분위기</label>
+        <label for="outputLanguage">출력 언어 <span class="label-sub">Output language</span></label>
+        <select id="outputLanguage">
+          <option value="ko" selected>한글 (Korean)</option>
+          <option value="en">English</option>
+        </select>
+
+        <label for="tone">분위기 <span class="label-sub">Tone</span></label>
         <select id="tone">
           <optgroup label="개인형">
-            <option>보통</option>
-            <option>친근하게</option>
-            <option selected>정중하게</option>
-            <option>아주 정중하게</option>
-            <option>캐주얼하게</option>
-            <option>미안함</option>
-            <option>제안함</option>
-            <option>사랑함</option>
+            <option value="보통">보통 (Neutral)</option>
+            <option value="친근하게">친근하게 (Friendly)</option>
+            <option value="정중하게" selected>정중하게 (Polite)</option>
+            <option value="아주 정중하게">아주 정중하게 (Very Polite)</option>
+            <option value="캐주얼하게">캐주얼하게 (Casual)</option>
+            <option value="미안함">미안함 (Apologetic)</option>
+            <option value="제안함">제안함 (Suggestive)</option>
+            <option value="사랑함">사랑함 (Affectionate)</option>
           </optgroup>
           <optgroup label="비즈니스형">
-            <option>공손하지만 단호하게</option>
-            <option>보고 요청</option>
-            <option>제안서</option>
-            <option>일정 변경</option>
-            <option>회식 제안</option>
-            <option>업무 변경</option>
+            <option value="공손하지만 단호하게">공손하지만 단호하게 (Firm but Polite)</option>
+            <option value="보고 요청">보고 요청 (Request Update)</option>
+            <option value="제안서">제안서 (Proposal)</option>
+            <option value="일정 변경">일정 변경 (Schedule Change)</option>
+            <option value="회식 제안">회식 제안 (Team Outing)</option>
+            <option value="업무 변경">업무 변경 (Work Change)</option>
           </optgroup>
         </select>
 
-        <label for="recipient">보내는 대상</label>
+        <label for="recipient">보내는 대상 <span class="label-sub">Recipient</span></label>
         <select id="recipient">
-          <option>상사</option>
-          <option>동료</option>
-          <option>친구</option>
-          <option>학부모</option>
-          <option>고객</option>
-          <option>거래처</option>
-          <option>연인</option>
-          <option>가족</option>
-          <option selected>기타</option>
+          <option value="상사">상사 (Manager)</option>
+          <option value="동료">동료 (Coworker)</option>
+          <option value="친구">친구 (Friend)</option>
+          <option value="학부모">학부모 (Parent)</option>
+          <option value="고객">고객 (Customer)</option>
+          <option value="거래처">거래처 (Business Partner)</option>
+          <option value="연인">연인 (Partner)</option>
+          <option value="가족">가족 (Family)</option>
+          <option value="기타" selected>기타 (Other)</option>
         </select>
 
-        <label for="senderRole">본인 역할</label>
+        <label for="senderRole">본인 역할 <span class="label-sub">Your role</span></label>
         <input id="senderRole" type="text" placeholder="예: 팀원, 자녀 보호자, 담임교사" />
 
-        <label for="originalText">원본 문자</label>
+        <label for="originalText">원본 문자 <span class="label-sub">Original message</span></label>
         <textarea id="originalText" rows="6" placeholder="정중하게 바꾸고 싶은 원본 문장을 입력하세요"></textarea>
         <p id="originalTextError" class="field-error"></p>
 
-        <button id="backgroundToggleBtn" type="button" class="inline-toggle">상황 설명 추가</button>
+        <button id="backgroundToggleBtn" type="button" class="inline-toggle">상황 설명 추가<span class="btn-sub">Add context</span></button>
         <div id="backgroundWrap" class="background-wrap hidden">
-          <label for="backgroundNote">배경 설명 (선택)</label>
+          <label for="backgroundNote">배경 설명 (선택) <span class="label-sub">Background note</span></label>
           <textarea id="backgroundNote" rows="3" maxlength="100" placeholder="예: 애칭은 자기야 / 최근 보고 방식 때문에 감정이 상한 상태"></textarea>
           <p id="backgroundNoteMeta" class="helper-text">최대 100자. 참고만 하고 결과문에 직접 인용하지 않습니다.</p>
         </div>
 
         <label class="inline option-row">
           <input id="harshFilterEnabled" type="checkbox" checked />
-          과한 표현 순화
+          과한 표현 순화 <span class="label-sub inline-sub">Soften harsh wording</span>
         </label>
         <p class="helper-text option-helper">욕설이나 날카로운 표현은 덜 세게 다듬고, 핵심 요청은 최대한 유지합니다.</p>
 
         <div class="actions compose-actions">
-          <button id="rewriteBtn" type="button">메세지 다듬기</button>
-          <button id="resetBtn" type="button" class="ghost">초기화</button>
-          <button id="copyBtn" type="button" class="ghost">결과 복사</button>
+          <button id="rewriteBtn" type="button">메세지 다듬기<span class="btn-sub">Rewrite</span></button>
+          <button id="resetBtn" type="button" class="ghost">초기화<span class="btn-sub">Reset</span></button>
+          <button id="copyBtn" type="button" class="ghost">결과 복사<span class="btn-sub">Copy result</span></button>
         </div>
 
-        <label for="rewrittenText">변환 문자</label>
+        <label for="rewrittenText">변환 문자 <span class="label-sub">Rewritten message</span></label>
         <textarea id="rewrittenText" rows="7" readonly></textarea>
       </section>
 
